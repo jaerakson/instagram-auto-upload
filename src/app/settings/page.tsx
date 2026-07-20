@@ -1,0 +1,350 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff } from 'lucide-react';
+import type { AppSettings, CredentialKey, CredentialStatus } from '@/types';
+
+interface KeyConfig {
+  key: CredentialKey;
+  label: string;
+  icon: typeof Camera;
+  color: string;
+}
+
+const defaultSettings: AppSettings = {
+  autoMode: false,
+  postTime: '19:00',
+  language: 'ko',
+  instagramConnected: false,
+  googleSheetsConnected: false,
+  geminiConnected: false,
+};
+
+export default function SettingsPage() {
+  const t = useTranslations('settings');
+  const currentLocale = useLocale() as 'ko' | 'en';
+  const [settings, setSettings] = useState<AppSettings>({ ...defaultSettings, language: currentLocale });
+  const [saved, setSaved] = useState(false);
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/sheets/settings');
+        const json = await res.json();
+        if (json.success && json.data) {
+          // language는 쿠키(현재 로케일) 기준으로 유지, Sheets 값으로 덮어쓰지 않음
+          setSettings({ ...json.data, language: currentLocale });
+        }
+      } catch {
+        // use defaults
+      }
+    }
+    loadSettings();
+  }, [currentLocale]);
+
+  const [credentials, setCredentials] = useState<CredentialStatus[]>([]);
+  const [inputValues, setInputValues] = useState<Record<CredentialKey, string>>({
+    INSTAGRAM_ACCESS_TOKEN: '',
+    INSTAGRAM_USER_ID: '',
+    GEMINI_KEY: '',
+  });
+  const [showKey, setShowKey] = useState<Record<CredentialKey, boolean>>({
+    INSTAGRAM_ACCESS_TOKEN: false,
+    INSTAGRAM_USER_ID: false,
+    GEMINI_KEY: false,
+  });
+  const [savingKey, setSavingKey] = useState<CredentialKey | null>(null);
+  const [savedKey, setSavedKey] = useState<CredentialKey | null>(null);
+  const [saveError, setSaveError] = useState<CredentialKey | null>(null);
+
+  const keyConfigs: KeyConfig[] = [
+    { key: 'INSTAGRAM_ACCESS_TOKEN', label: t('instagramToken'), icon: Camera, color: 'from-purple-500 to-pink-500' },
+    { key: 'INSTAGRAM_USER_ID', label: t('instagramUserId'), icon: Camera, color: 'from-purple-500 to-pink-500' },
+    { key: 'GEMINI_KEY', label: t('geminiApiKey'), icon: Cpu, color: 'from-blue-500 to-indigo-600' },
+  ];
+
+  useEffect(() => {
+    fetchCredentialStatus();
+  }, []);
+
+  async function fetchCredentialStatus() {
+    try {
+      const res = await fetch('/api/settings/credentials');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setCredentials(json.data);
+          return;
+        }
+      }
+      setFallbackCredentials();
+    } catch {
+      setFallbackCredentials();
+    }
+  }
+
+  function setFallbackCredentials() {
+    setCredentials([
+      { key: 'INSTAGRAM_ACCESS_TOKEN', configured: false },
+      { key: 'INSTAGRAM_USER_ID', configured: false },
+      { key: 'GEMINI_KEY', configured: false },
+    ]);
+  }
+
+  function isConfigured(key: CredentialKey): boolean {
+    return credentials.find((c) => c.key === key)?.configured ?? false;
+  }
+
+  async function handleSaveKey(key: CredentialKey) {
+    const value = inputValues[key].trim();
+    if (!value) return;
+
+    setSavingKey(key);
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/settings/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      });
+      if (res.ok) {
+        setInputValues((prev) => ({ ...prev, [key]: '' }));
+        setCredentials((prev) =>
+          prev.map((c) => (c.key === key ? { ...c, configured: true, updatedAt: new Date().toISOString() } : c))
+        );
+        setSavedKey(key);
+        setTimeout(() => setSavedKey(null), 2000);
+      } else {
+        setSaveError(key);
+        setTimeout(() => setSaveError(null), 2000);
+      }
+    } catch {
+      setSaveError(key);
+      setTimeout(() => setSaveError(null), 2000);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  async function handleDeleteKey(key: CredentialKey) {
+    if (!confirm(t('deleteConfirm'))) return;
+
+    try {
+      const res = await fetch('/api/settings/credentials', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      if (res.ok) {
+        setCredentials((prev) =>
+          prev.map((c) => (c.key === key ? { ...c, configured: false, updatedAt: undefined } : c))
+        );
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
+  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  }
+
+  async function handleSave() {
+    setSettingsSaveError(null);
+    try {
+      // language는 항상 현재 쿠키 로케일과 동기화하여 저장
+      const res = await fetch('/api/sheets/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...settings, language: currentLocale }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } else {
+        setSettingsSaveError('Failed to save');
+        setTimeout(() => setSettingsSaveError(null), 3000);
+      }
+    } catch {
+      setSettingsSaveError('Failed to save');
+      setTimeout(() => setSettingsSaveError(null), 3000);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+
+      {/* Auto Mode */}
+      <Card className="border-slate-800 bg-slate-900">
+        <CardContent className="flex items-center justify-between p-5">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-white">{t('autoMode')}</p>
+            <p className="text-xs text-slate-400">{t('autoModeDesc')}</p>
+          </div>
+          <Switch
+            checked={settings.autoMode}
+            onCheckedChange={(checked) => update('autoMode', checked)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Upload Time */}
+      <Card className="border-slate-800 bg-slate-900">
+        <CardContent className="p-5">
+          <Label htmlFor="postTime" className="mb-2 block text-sm text-white">
+            {t('postTime')}
+          </Label>
+          <Input
+            id="postTime"
+            type="time"
+            value={settings.postTime}
+            onChange={(e) => update('postTime', e.target.value)}
+            className="w-40 border-slate-700 bg-slate-950 text-slate-200"
+          />
+        </CardContent>
+      </Card>
+
+      {/* API Keys */}
+      <Card className="border-slate-800 bg-slate-900">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Key className="h-5 w-5" />
+            {t('apiKeys')}
+          </CardTitle>
+          <p className="text-xs text-slate-400">{t('apiKeysDesc')}</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {keyConfigs.map(({ key, label, icon: Icon, color }) => (
+            <div
+              key={key}
+              className="rounded-lg border border-slate-800 bg-slate-950 p-4"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ${color}`}>
+                    <Icon className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-slate-200">{label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'border-0 text-xs',
+                      isConfigured(key)
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-red-500/10 text-red-400'
+                    )}
+                  >
+                    {isConfigured(key) ? t('configured') : t('notConfigured')}
+                  </Badge>
+                  {isConfigured(key) && (
+                    <button
+                      onClick={() => handleDeleteKey(key)}
+                      className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                    >
+                      {t('deleteKey')}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showKey[key] ? 'text' : 'password'}
+                    placeholder={t('enterKey')}
+                    value={inputValues[key]}
+                    onChange={(e) => setInputValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500 pr-10"
+                  />
+                  {!isConfigured(key) && inputValues[key] && (
+                    <button
+                      type="button"
+                      onClick={() => setShowKey((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      {showKey[key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  )}
+                </div>
+                <Button
+                  onClick={() => handleSaveKey(key)}
+                  disabled={!inputValues[key].trim() || savingKey === key}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 shrink-0"
+                >
+                  {savingKey === key ? (
+                    '...'
+                  ) : savedKey === key ? (
+                    <><Check className="mr-1 h-3 w-3" />{t('saved')}</>
+                  ) : saveError === key ? (
+                    t('saveError')
+                  ) : (
+                    t('save')
+                  )}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Language */}
+      <Card className="border-slate-800 bg-slate-900">
+        <CardContent className="p-5">
+          <Label className="mb-3 block text-sm text-white">{t('language')}</Label>
+          <div className="flex gap-1 rounded-lg bg-slate-800 p-0.5 w-fit">
+            {(['ko', 'en'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => {
+                  if (lang === settings.language) return;
+                  document.cookie = `locale=${lang}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+                  window.location.reload();
+                }}
+                className={cn(
+                  'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                  settings.language === lang
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                )}
+              >
+                {lang === 'ko' ? 'Korean' : 'English'}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save */}
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={handleSave}
+          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600"
+        >
+          {saved ? (
+            <>
+              <Check className="mr-1.5 h-4 w-4" />
+              {t('saved')}
+            </>
+          ) : (
+            t('save')
+          )}
+        </Button>
+        {settingsSaveError && (
+          <span className="text-sm text-red-400">{settingsSaveError}</span>
+        )}
+      </div>
+    </div>
+  );
+}

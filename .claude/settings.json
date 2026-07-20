@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "harness@harness-marketplace": true
+  },
+  "defaultMode": "acceptEdits"
+}
