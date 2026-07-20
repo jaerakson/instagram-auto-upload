@@ -336,6 +336,68 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     }
   }
 
+  async generateRecommendation(
+    posts: Array<{ style: string; hashtags: string }>,
+    performance: Array<{ mediaId: string; likes: number; comments: number; saves: number; reach: number }>,
+  ): Promise<{ recommendations: string[] }> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
+
+    const dataSummary = posts
+      .map((post, i) => {
+        const perf = performance[i];
+        return `Style: ${post.style || 'unknown'}, Hashtags: ${post.hashtags || 'none'}, Likes: ${perf?.likes ?? 0}, Comments: ${perf?.comments ?? 0}, Saves: ${perf?.saves ?? 0}, Reach: ${perf?.reach ?? 0}`;
+      })
+      .join('\n');
+
+    const systemInstruction = `You are an Instagram AI art performance analyst. Analyze the following post performance data and provide exactly 4 actionable recommendations in JSON format.
+
+Post data:
+${dataSummary}
+
+Provide recommendations covering:
+1. Most effective style and why
+2. Recommended style combination for next post
+3. Most efficient hashtags based on engagement
+4. Optimal posting strategy
+
+Each recommendation should be specific to the data, citing actual numbers when available.
+Keep each recommendation to 1-2 sentences.
+
+Respond ONLY in this exact JSON format (no markdown, no code blocks):
+{"recommendations": ["rec1", "rec2", "rec3", "rec4"]}`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ parts: [{ text: 'Analyze this Instagram post performance data and give me 4 actionable recommendations.' }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      throw new Error(error.error?.message || `Gemini API error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error('No response from Gemini');
+    }
+
+    const parsed = this.parseGeminiJson<{ recommendations: string[] }>(text);
+    if (!parsed.recommendations || !Array.isArray(parsed.recommendations)) {
+      throw new Error('Gemini recommendation response missing recommendations array');
+    }
+    return { recommendations: parsed.recommendations.slice(0, 4) };
+  }
+
   async generateCaptionWithRetry(
     options: Parameters<GeminiService['generateCaption']>[0],
     maxRetries = 5,

@@ -43,6 +43,8 @@ export default function AnalyticsPage() {
   const [weeklyEngagement, setWeeklyEngagement] = useState<WeeklyEngagement[]>([]);
   const [stylePerformance, setStylePerformance] = useState<StylePerformance[]>([]);
   const [hashtagStats, setHashtagStats] = useState<HashtagStat[]>([]);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [recLoading, setRecLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
@@ -114,8 +116,19 @@ export default function AnalyticsPage() {
           .sort((a, b) => b.avgLikes - a.avgLikes)
           .slice(0, 10);
         setHashtagStats(hashtags);
+        // Fetch AI recommendations in parallel (non-blocking)
+        fetch('/api/analytics/recommendation')
+          .then(async (recRes) => {
+            if (recRes.ok) {
+              const recJson = await recRes.json();
+              setRecommendations(recJson.data?.recommendations ?? []);
+            }
+          })
+          .catch(() => {})
+          .finally(() => setRecLoading(false));
       } catch {
         // silently handle network errors - show empty state
+        setRecLoading(false);
       } finally {
         setLoading(false);
       }
@@ -276,24 +289,27 @@ export default function AnalyticsPage() {
               <p className="mb-2 text-xs font-medium text-slate-500">
                 {t('nextDirection')}
               </p>
-              <ul className="space-y-2 text-sm text-slate-300">
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
-                  Anime-style portraits show highest engagement (avg 523 likes). Increase frequency.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-pink-400" />
-                  Combine cyberpunk elements with anime aesthetics for a hybrid style.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
-                  Use #digitalart and #anime hashtags together for optimal reach.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                  Post between 7-8 PM for peak engagement window.
-                </li>
-              </ul>
+              {recLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                </div>
+              ) : recommendations.length > 0 ? (
+                <ul className="space-y-2 text-sm text-slate-300">
+                  {recommendations.map((rec, i) => {
+                    const dotColors = ['bg-purple-400', 'bg-pink-400', 'bg-orange-400', 'bg-emerald-400'];
+                    return (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${dotColors[i % dotColors.length]}`} />
+                        {rec}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-500 py-4 text-center">
+                  {t('recNoData')}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

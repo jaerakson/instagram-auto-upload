@@ -83,7 +83,8 @@
     "comments": "Comments",
     "saves": "Saves",
     "reach": "Reach",
-    "noData": "Not enough data to analyze"
+    "noData": "Not enough data to analyze",
+    "recNoData": "Not enough post data for AI recommendations"
   },
   "settings": {
     "title": "Settings",

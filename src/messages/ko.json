@@ -83,7 +83,8 @@
     "comments": "댓글",
     "saves": "저장",
     "reach": "도달",
-    "noData": "분석할 데이터가 충분하지 않습니다"
+    "noData": "분석할 데이터가 충분하지 않습니다",
+    "recNoData": "AI 추천을 위한 게시물 데이터가 부족합니다"
   },
   "settings": {
     "title": "설정",
