@@ -17,35 +17,48 @@ export class InstagramService {
     return res.json() as Promise<T>;
   }
 
-  async uploadPhoto(imageUrl: string, caption: string): Promise<{ mediaId: string }> {
-    // Step 1: Create media container
-    const container = await this.request<{ id: string }>(
-      `${this.baseUrl}/${this.userId}/media`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: imageUrl,
-          caption,
-          access_token: this.accessToken,
-        }),
-      },
-    );
+  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string }> {
+    let lastError: Error | null = null;
 
-    // Step 2: Publish media
-    const published = await this.request<{ id: string }>(
-      `${this.baseUrl}/${this.userId}/media_publish`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          creation_id: container.id,
-          access_token: this.accessToken,
-        }),
-      },
-    );
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Step 1: Create media container
+        const container = await this.request<{ id: string }>(
+          `${this.baseUrl}/${this.userId}/media`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_url: imageUrl,
+              caption,
+              access_token: this.accessToken,
+            }),
+          },
+        );
 
-    return { mediaId: published.id };
+        // Step 2: Publish media
+        const published = await this.request<{ id: string }>(
+          `${this.baseUrl}/${this.userId}/media_publish`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creation_id: container.id,
+              access_token: this.accessToken,
+            }),
+          },
+        );
+
+        return { mediaId: published.id };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+        }
+      }
+    }
+
+    throw new Error(`Upload failed after ${maxRetries} attempts: ${lastError?.message}`);
   }
 
   async getMediaInsights(mediaId: string): Promise<{

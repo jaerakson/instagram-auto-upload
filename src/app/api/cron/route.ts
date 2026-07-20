@@ -30,7 +30,16 @@ export async function GET(request: Request) {
     // Step 1: Refresh Instagram token (extends 60 days from now)
     const tokenResult = await refreshInstagramToken();
 
-    // Step 2: Trigger pipeline in auto mode
+    // Step 2: Get language setting
+    let language = 'en';
+    try {
+      const settings = await import('@/lib/google-sheets').then((m) => m.sheetsService.getSettings());
+      language = settings.language || 'en';
+    } catch {
+      // Default to English
+    }
+
+    // Step 3: Trigger pipeline in auto mode (full AI pipeline)
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000';
@@ -40,7 +49,7 @@ export async function GET(request: Request) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: 'auto',
-        prompt: 'AI-generated Instagram content based on current trends',
+        language,
       }),
     });
 

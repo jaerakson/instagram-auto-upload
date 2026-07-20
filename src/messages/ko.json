@@ -51,7 +51,9 @@
     "langJa": "日本語",
     "langJaKo": "日本語 + 한국어",
     "imagePreview": "이미지 미리보기",
-    "generatingImage": "이미지 생성 중..."
+    "generatingImage": "이미지 생성 중...",
+    "autoAll": "전체 자동 생성",
+    "autoAllRunning": "자동 생성 중..."
   },
   "history": {
     "title": "작업 내역",

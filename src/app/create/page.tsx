@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
+  Play,
 } from 'lucide-react';
 import type { PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 
@@ -65,6 +66,7 @@ export default function CreatePage() {
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [regeneratingCaption, setRegeneratingCaption] = useState(false);
   const [regeneratingHashtags, setRegeneratingHashtags] = useState(false);
+  const [autoAllRunning, setAutoAllRunning] = useState(false);
 
   // AI auto-generate: trend analysis + prompt generation → auto-complete trend step
   async function handleAutoGenerate() {
@@ -134,9 +136,165 @@ export default function CreatePage() {
     }
   }
 
+  // Full pipeline: trend → image → caption → confirm caption → upload
+  async function handleAutoAll() {
+    setAutoAllRunning(true);
+    setErrorMsg('');
+    try {
+      // Step 1: Trend analysis + prompt generation
+      setGeneratingPrompt(true);
+      const promptRes = await fetch('/api/generate-prompt', { method: 'POST' });
+      const promptJson = await promptRes.json();
+      if (!promptJson.success) throw new Error(promptJson.error || 'Prompt generation failed');
+
+      const generatedPrompt = promptJson.data.prompt;
+      const generatedStyle = promptJson.data.style;
+      const generatedTrendReport = promptJson.data.trendReport || '';
+
+      setPrompt(generatedPrompt);
+      setStyle(generatedStyle);
+      if (generatedTrendReport) setTrendReport(generatedTrendReport);
+
+      const trendResult: TrendResult = {
+        summary: generatedTrendReport || `Style: ${generatedStyle}`,
+        topStyles: generatedStyle ? generatedStyle.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        keywords: generatedPrompt.split(' ').filter((w: string) => w.length > 3),
+        hashtags: ['#AIart', '#AIgenerated'],
+        avoidList: [],
+      };
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[0] = { step: 'trend', status: 'complete', result: trendResult };
+        return next;
+      });
+      setGeneratingPrompt(false);
+
+      // Step 2: Image generation
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[1] = { ...next[1], status: 'running', error: undefined };
+        return next;
+      });
+      const imgRes = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: generatedPrompt.trim(), aspectRatio: '1:1' }),
+      });
+      const imgJson = await imgRes.json();
+      if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
+      const imageResult: ImageResult = {
+        imageUrl: imgJson.data.imageUrl,
+        prompt: generatedPrompt.trim(),
+        designIntent: generatedStyle || '',
+        model: 'imagen-4.0-generate-001',
+        imageSize: '1:1',
+      };
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[1] = { step: 'image', status: 'complete', result: imageResult };
+        return next;
+      });
+
+      // Step 3: Caption generation
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[2] = { ...next[2], status: 'running', error: undefined };
+        return next;
+      });
+      const capRes = await fetch('/api/generate-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: generatedPrompt.trim(),
+          style: generatedStyle,
+          language: captionLang,
+          mode: 'full',
+        }),
+      });
+      const capJson = await capRes.json();
+      if (!capJson.success) throw new Error(capJson.error || 'Caption generation failed');
+
+      const generatedCaption = capJson.data.caption;
+      const generatedHashtags = capJson.data.hashtags;
+      setEditCaption(generatedCaption);
+      setEditHashtags(generatedHashtags);
+
+      // Auto-confirm caption
+      const captionResult: CaptionResult = {
+        caption: generatedCaption,
+        hashtags: generatedHashtags,
+        fullText: `${generatedCaption}\n\n${generatedHashtags}`.trim(),
+        strategy: 'confirmed',
+      };
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[2] = { step: 'caption', status: 'complete', result: captionResult };
+        return next;
+      });
+
+      // Step 4: Upload
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[3] = { ...next[3], status: 'running', error: undefined };
+        return next;
+      });
+      const fullText = `${generatedCaption}\n\n${generatedHashtags}`.trim();
+      const uploadRes = await fetch('/api/instagram/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: imageResult.imageUrl, caption: fullText }),
+      });
+      const uploadJson = await uploadRes.json();
+      if (!uploadJson.success) throw new Error(uploadJson.error || 'Upload failed');
+      const uploadResult: UploadResult = {
+        success: true,
+        mediaId: uploadJson.data.mediaId,
+        postedAt: new Date().toISOString(),
+      };
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          date: new Date().toISOString(),
+          prompt: generatedPrompt.trim(),
+          caption: generatedCaption,
+          hashtags: generatedHashtags,
+          imageUrl: imageResult.imageUrl,
+          mediaId: uploadJson.data.mediaId,
+          mediaUrl: '',
+          status: 'published',
+          trendReport: generatedTrendReport,
+          style: generatedStyle || '',
+        }),
+      });
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[3] = { step: 'upload', status: 'complete', result: uploadResult };
+        return next;
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      setErrorMsg(msg);
+      // Mark the currently running step as error
+      setPipeline((prev) => {
+        const next = [...prev];
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].status === 'running') {
+            next[i] = { ...next[i], status: 'error', error: msg };
+          }
+        }
+        return next;
+      });
+    } finally {
+      setGeneratingPrompt(false);
+      setAutoAllRunning(false);
+    }
+  }
+
   function canRun(stepIndex: number) {
     if (stepIndex === 0) {
-      return (pipeline[0].status === 'idle' || pipeline[0].status === 'error') && prompt.trim().length > 0;
+      return pipeline[0].status === 'idle' || pipeline[0].status === 'error';
     }
     if (stepIndex === 1) {
       return pipeline[0].status === 'complete' && (pipeline[1].status === 'idle' || pipeline[1].status === 'error');
@@ -276,6 +434,19 @@ export default function CreatePage() {
         </div>
       )}
 
+      <Button
+        size="lg"
+        disabled={autoAllRunning || pipeline.some((s) => s.status === 'running')}
+        onClick={handleAutoAll}
+        className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white text-lg font-semibold hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 disabled:opacity-50 h-14 rounded-xl shadow-lg shadow-purple-500/20"
+      >
+        {autoAllRunning ? (
+          <><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('autoAllRunning')}</>
+        ) : (
+          <><Play className="mr-2 h-5 w-5" />{t('autoAll')}</>
+        )}
+      </Button>
+
       <div className="space-y-4">
         {steps.map(({ step, icon: Icon }, i) => {
           const pipelineStep = pipeline[i];
@@ -333,15 +504,15 @@ export default function CreatePage() {
                   ) : (
                     <Button
                       size="sm"
-                      variant="outline"
-                      disabled={!isRunnable}
-                      onClick={() => runStep(i)}
-                      className="border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                      disabled={!isRunnable || generatingPrompt || autoAllRunning}
+                      onClick={handleAutoGenerate}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-40"
                     >
-                      {pipelineStep.status === 'running' && (
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      {generatingPrompt ? (
+                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('autoGenerating')}</>
+                      ) : (
+                        <><Sparkles className="mr-1.5 h-3.5 w-3.5" />{t('autoGenerate')}</>
                       )}
-                      {pipelineStep.status === 'running' ? t('running') : t('run')}
                     </Button>
                   )}
                 </div>

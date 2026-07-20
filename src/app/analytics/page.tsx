@@ -66,7 +66,7 @@ export default function AnalyticsPage() {
 
         // weeklyEngagement: map performance data directly
         const weekly = performanceData.map((p) => ({
-          date: p.date.slice(5), // "07/18" format
+          date: p.date.slice(5, 10), // "07-18" format
           likes: p.likes,
           comments: p.comments,
           saves: p.saves,
