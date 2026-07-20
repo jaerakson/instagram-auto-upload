@@ -530,45 +530,14 @@ export default function CreatePage() {
                 </div>
               </CardHeader>
 
-              {/* Step 1: Trend / Prompt input */}
+              {/* Step 1: Trend / Prompt input — idle or error: show AI button only */}
               {step === 'trend' && (pipelineStep.status === 'idle' || pipelineStep.status === 'error') && (
                 <CardContent className="border-t border-slate-800 pt-4 space-y-3">
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={handleAutoGenerate}
-                      disabled={generatingPrompt}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50"
-                    >
-                      {generatingPrompt ? (
-                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('autoGenerating')}</>
-                      ) : (
-                        <><Sparkles className="mr-1.5 h-3.5 w-3.5" />{t('autoGenerate')}</>
-                      )}
-                    </Button>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs text-slate-500">{t('promptLabel')}</label>
-                    <Input
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={t('promptPlaceholder')}
-                      className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs text-slate-500">{t('styleLabel')}</label>
-                    <Input
-                      value={style}
-                      onChange={(e) => setStyle(e.target.value)}
-                      placeholder={t('stylePlaceholder')}
-                      className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
-                    />
-                  </div>
+                  <p className="text-xs text-slate-500">AI 자동 생성 버튼을 클릭하면 트렌드 분석 후 프롬프트와 스타일이 자동으로 채워집니다.</p>
                 </CardContent>
               )}
 
-              {/* Step 1: Trend result (after auto-generate completes) */}
+              {/* Step 1: Trend result — prompt 읽기전용 + 스타일 편집 가능 */}
               {step === 'trend' && pipelineStep.status === 'complete' && pipelineStep.result && (
                 <CardContent className="border-t border-slate-800 pt-4">
                   <TrendResultView result={pipelineStep.result as TrendResult} />
@@ -577,12 +546,15 @@ export default function CreatePage() {
                       <label className="mb-1.5 block text-xs text-slate-500">{t('promptLabel')}</label>
                       <p className="text-sm text-slate-300 bg-slate-950 rounded-lg px-3 py-2 border border-slate-700">{prompt}</p>
                     </div>
-                    {style && (
-                      <div>
-                        <label className="mb-1.5 block text-xs text-slate-500">{t('styleLabel')}</label>
-                        <p className="text-sm text-slate-400">{style}</p>
-                      </div>
-                    )}
+                    <div>
+                      <label className="mb-1.5 block text-xs text-slate-500">{t('styleLabel')}</label>
+                      <Input
+                        value={style}
+                        onChange={(e) => setStyle(e.target.value)}
+                        placeholder={t('stylePlaceholder')}
+                        className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               )}

@@ -224,11 +224,24 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     const languageToneMap: Record<string, string> = {
-      ko: 'Write in Korean with a sentimental, emotional tone (감성적인 톤). Hashtags: use Korean hashtags (e.g. #AI아트 #감성사진).',
-      en: 'Write in English with an editorial, refined tone. Hashtags: use English only (e.g. #AIart #cinematicportrait).',
-      'ko+en': 'Write the main body in Korean (감성적 톤), then add one natural English line at the end. Mix naturally. Hashtags: use English only for global reach (e.g. #AIart #digitalportrait).',
-      ja: 'Write in Japanese with a polite yet emotional tone (丁寧で感性的なトーン). Hashtags: mix Japanese and English (e.g. #AI写真 #cinematicportrait).',
-      'ja+ko': 'Write the main body in Japanese (感性的なトーン), then add one natural Korean line at the end. Hashtags: use English only for global reach (e.g. #AIart #aestheticphoto).',
+      ko: `Write the ENTIRE caption in Korean with a sentimental, emotional tone (감성적인 톤).
+Hashtags: use Korean hashtags (e.g. #AI아트 #감성사진 #시네마틱 #인공지능아트 #감성피드).`,
+      en: `Write the ENTIRE caption in English with an editorial, refined tone.
+Hashtags: use English only (e.g. #AIart #cinematicportrait #filmgrain #digitalart #aestheticfeed).`,
+      'ko+en': `CRITICAL: The caption MUST contain BOTH Korean AND English text. Structure:
+- First 1-2 lines: Korean (감성적 톤)
+- Last line: English (natural, not translated)
+Example caption format:
+"빛이 스며드는 카페의 고요한 순간.\nA quiet cinematic moment, captured in light."
+Hashtags: mix Korean and English hashtags (e.g. #AI아트 #cinematicportrait #감성사진 #filmgrain #aestheticfeed).`,
+      ja: `Write the ENTIRE caption in Japanese with a polite yet emotional tone (丁寧で感性的なトーン).
+Hashtags: mix Japanese and English (e.g. #AI写真 #cinematicportrait #デジタルアート #filmgrain #美的).`,
+      'ja+ko': `CRITICAL: The caption MUST contain BOTH Japanese AND Korean text. Structure:
+- First 1-2 lines: Japanese (感性的なトーン)
+- Last line: Korean (자연스럽게)
+Example caption format:
+"光が差し込むカフェの静かな瞬間。\n빛 속에 담긴 시네마틱 한 순간."
+Hashtags: mix Japanese, Korean and English (e.g. #AI写真 #AI아트 #cinematicportrait #感性写真 #aestheticfeed).`,
     };
 
     const modeInstruction: Record<string, string> = {
@@ -300,5 +313,42 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       caption: parsed.caption || '',
       hashtags: parsed.hashtags || '',
     };
+  }
+
+  private validateCaptionLanguage(
+    caption: string,
+    hashtags: string,
+    language: string,
+  ): boolean {
+    const hasKorean = /[가-힣]/.test(caption);
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(caption);
+    const hasEnglish = /[a-zA-Z]{3,}/.test(caption);
+    const hashtagHasKorean = /[가-힣]/.test(hashtags);
+    const hashtagHasEnglish = /[a-zA-Z]{2,}/.test(hashtags);
+
+    switch (language) {
+      case 'ko': return hasKorean;
+      case 'en': return hasEnglish && !hasKorean && !hasJapanese;
+      case 'ko+en': return hasKorean && hasEnglish && hashtagHasKorean && hashtagHasEnglish;
+      case 'ja': return hasJapanese;
+      case 'ja+ko': return hasJapanese && hasKorean;
+      default: return true;
+    }
+  }
+
+  async generateCaptionWithRetry(
+    options: Parameters<GeminiService['generateCaption']>[0],
+    maxRetries = 5,
+  ): Promise<{ caption: string; hashtags: string }> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const result = await this.generateCaption(options);
+      if (this.validateCaptionLanguage(result.caption, result.hashtags, options.language)) {
+        return result;
+      }
+      if (attempt === maxRetries) {
+        return result; // Return last attempt even if validation fails
+      }
+    }
+    return this.generateCaption(options); // Fallback
   }
 }

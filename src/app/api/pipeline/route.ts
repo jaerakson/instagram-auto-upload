@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
       // Step 3: Caption generation via Gemini
       steps[2] = { step: 'caption', status: 'running' };
-      const captionResult = await geminiService.generateCaption({
+      const captionResult = await geminiService.generateCaptionWithRetry({
         prompt: finalPrompt,
         style: finalStyle,
         language: captionLang,

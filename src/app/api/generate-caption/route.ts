@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const geminiService = await getGeminiService();
-    const result = await geminiService.generateCaption({
+    const result = await geminiService.generateCaptionWithRetry({
       prompt,
       style,
       language: lang,
