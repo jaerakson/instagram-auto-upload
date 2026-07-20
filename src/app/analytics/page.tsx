@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Lightbulb, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Lightbulb, Loader2, RefreshCw } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -45,6 +46,27 @@ export default function AnalyticsPage() {
   const [hashtagStats, setHashtagStats] = useState<HashtagStat[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [recLoading, setRecLoading] = useState(true);
+  const [collecting, setCollecting] = useState(false);
+  const [collectMsg, setCollectMsg] = useState('');
+
+  async function handleCollectInsights() {
+    setCollecting(true);
+    setCollectMsg('');
+    try {
+      const res = await fetch('/api/analytics/collect', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        setCollectMsg(`${json.data?.collected ?? 0}건 수집 완료`);
+        window.location.reload();
+      } else {
+        setCollectMsg(json.error || '수집 실패');
+      }
+    } catch {
+      setCollectMsg('수집 실패');
+    } finally {
+      setCollecting(false);
+    }
+  }
 
   useEffect(() => {
     async function fetchData() {
@@ -149,10 +171,32 @@ export default function AnalyticsPage() {
     );
   }
 
+  const collectButton = (
+    <div className="flex items-center gap-3">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleCollectInsights}
+        disabled={collecting}
+        className="border-slate-700 text-slate-300 hover:bg-slate-800"
+      >
+        {collecting ? (
+          <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />수집 중...</>
+        ) : (
+          <><RefreshCw className="mr-1.5 h-3.5 w-3.5" />성과 수집</>
+        )}
+      </Button>
+      {collectMsg && <span className="text-xs text-slate-400">{collectMsg}</span>}
+    </div>
+  );
+
   if (weeklyEngagement.length === 0 && stylePerformance.length === 0 && hashtagStats.length === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+          {collectButton}
+        </div>
         <Card className="border-slate-800 bg-slate-900">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Lightbulb className="h-12 w-12 text-slate-600" />
@@ -165,7 +209,10 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        {collectButton}
+      </div>
 
       {/* Engagement Trend */}
       <Card className="border-slate-800 bg-slate-900">

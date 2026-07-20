@@ -30,11 +30,11 @@ export async function GET(request: Request) {
     // Step 1: Refresh Instagram token (extends 60 days from now)
     const tokenResult = await refreshInstagramToken();
 
-    // Step 2: Get language setting
+    // Step 2: Get caption language setting
     let language = 'en';
     try {
       const settings = await import('@/lib/google-sheets').then((m) => m.sheetsService.getSettings());
-      language = settings.language || 'en';
+      language = settings.captionLanguage || settings.language || 'en';
     } catch {
       // Default to English
     }
@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     try {
       const insightsRes = await fetch(`${baseUrl}/api/instagram/collect-insights`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
       });
       const insightsData = await insightsRes.json();
       insightsResult = insightsData.success
