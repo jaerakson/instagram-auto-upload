@@ -1,3 +1,24 @@
+## 2026-07-20 16:30 (집)
+- 브랜치: main
+- 완료:
+  - 전체 자동 생성 기능 구현 (원클릭: 트렌드→이미지→캡션→업로드)
+  - AI 캡션 생성 + 5개 언어 지원 (ko, en, ko+en, ja, ja+ko)
+  - 혼합 언어 캡션/해시태그 검증 + 최대 5회 재시도 로직
+  - 업로드 5회 재시도 (Instagram API 안정성)
+  - Pipeline auto 모드 전면 개편 (cron = UI 자동생성과 동일 효과)
+  - 설정 페이지: 자동모드 ON→업로드시간+언어 표시, OFF→숨김
+  - 트렌드 UI 정리: AI 자동생성 버튼 1개 + 스타일 편집 가능
+  - analytics date 슬라이싱 버그 수정
+  - 게시물 2건 업로드 성공 (Media ID: 18082956752443609, 17863181478645342)
+- 현재 상태: 전체 파이프라인 정상 동작. 수동/자동 모두 테스트 완료.
+- 다음 할 일:
+  - Vercel 배포 후 cron 자동 실행 테스트
+  - Phase 5 성과 분석 (게시 후 24-48시간 경과 후 실행)
+  - AI 추천 섹션 실제 데이터 기반으로 개선 (현재 하드코딩)
+  - Google Sheets 게시기록 시트 데이터 확인
+- 관련 커밋: 5462cd1, 0d32644, 0dfbdee, 3191f67, 9145017
+- 푸시 여부: origin/main 에 푸시 완료
+
 ## 2026-07-20 15:00 (집)
 - 브랜치: main
 - 완료:
@@ -8,14 +29,5 @@
   - 파이프라인 Phase 1~4 전체 실행 성공
   - 첫 번째 게시물 업로드 완료 (Media ID: 18082956752443609)
 - 현재 상태: 파이프라인 정상 동작. 첫 게시물 업로드됨.
-- 다음 할 일:
-  - Phase 5 성과 분석 (게시 후 24-48시간 경과 후 실행)
-  - Vercel 배포 후 cron 자동 실행 테스트
-  - Google Sheets 게시기록 시트 연동 확인
-  - 두 번째 게시물 생성 (다른 스타일로 A/B 테스트)
 - 관련 파일/커밋: 5462cd1
-  - src/lib/gemini.ts (Imagen 4, 헤더 인증, 트렌드 분석)
-  - src/lib/instagram.ts (graph.instagram.com/v25.0, refreshToken)
-  - src/app/api/cron/route.ts (토큰 자동 갱신)
-  - .env.local (BLOB_READ_WRITE_TOKEN, BLOB_STORE_ID 추가)
 - 푸시 여부: origin/main 에 푸시 완료
