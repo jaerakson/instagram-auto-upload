@@ -5,7 +5,7 @@ import type { ApiResponse, PostRecord, PipelineStep, PerformanceRecord } from '@
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json<ApiResponse>(
       { success: false, error: 'Unauthorized' },
       { status: 401 },
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
         prompt: finalPrompt,
         caption: finalCaption,
         hashtags: finalHashtags,
-        imageUrl: imageResult.imageUrl,
+        imageUrl: uploadResult.imageUrl || imageResult.imageUrl,
         mediaId: uploadResult.mediaId,
         mediaUrl: uploadResult.mediaUrl,
         status: 'published',
@@ -222,7 +222,7 @@ export async function POST(request: Request) {
         prompt: finalPrompt,
         caption: finalCaption,
         hashtags: finalHashtags,
-        imageUrl: imageResult.imageUrl,
+        imageUrl: uploadResult.imageUrl || imageResult.imageUrl,
         mediaId: uploadResult.mediaId,
         mediaUrl: uploadResult.mediaUrl,
         status: 'published',

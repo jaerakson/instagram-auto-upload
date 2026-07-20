@@ -44,22 +44,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        const res = await fetch('/api/sheets/settings');
-        const json = await res.json();
-        if (json.success && json.data) {
-          // language는 쿠키(현재 로케일) 기준으로 유지, Sheets 값으로 덮어쓰지 않음
-          setSettings({ ...json.data, language: currentLocale });
-        }
-      } catch {
-        // use defaults
-      }
-    }
-    loadSettings();
-  }, [currentLocale]);
-
   const [credentials, setCredentials] = useState<CredentialStatus[]>([]);
   const [inputValues, setInputValues] = useState<Record<CredentialKey, string>>({
     INSTAGRAM_ACCESS_TOKEN: '',
@@ -82,8 +66,23 @@ export default function SettingsPage() {
   ];
 
   useEffect(() => {
-    fetchCredentialStatus();
-  }, []);
+    async function init() {
+      // 1) 설정 로드 먼저 — autoMode 등 Sheets 값 반영
+      try {
+        const res = await fetch('/api/sheets/settings');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSettings((prev) => ({ ...prev, ...json.data, language: currentLocale }));
+        }
+      } catch {
+        // use defaults
+      }
+
+      // 2) 인증 상태 확인 — 설정 로드 후 실행하여 race condition 방지
+      await fetchCredentialStatus();
+    }
+    init();
+  }, [currentLocale]);
 
   async function fetchCredentialStatus() {
     try {
@@ -205,16 +204,26 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
 
       {/* Auto Mode */}
-      <Card className="border-slate-800 bg-slate-900">
+      <Card className={cn("border-slate-800 bg-slate-900", settings.autoMode && "border-emerald-500/50")}>
         <CardContent className="flex items-center justify-between p-5">
           <div className="space-y-1">
             <p className="text-sm font-medium text-white">{t('autoMode')}</p>
             <p className="text-xs text-slate-400">{t('autoModeDesc')}</p>
           </div>
-          <Switch
-            checked={settings.autoMode}
-            onCheckedChange={(checked) => update('autoMode', checked)}
-          />
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              "text-xs font-semibold px-2 py-0.5 rounded-full",
+              settings.autoMode
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-slate-700/50 text-slate-500"
+            )}>
+              {settings.autoMode ? 'ON' : 'OFF'}
+            </span>
+            <Switch
+              checked={settings.autoMode}
+              onCheckedChange={(checked) => update('autoMode', checked)}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -224,7 +233,7 @@ export default function SettingsPage() {
           <Card className="border-slate-800 bg-slate-900">
             <CardContent className="p-5">
               <Label htmlFor="postTime" className="mb-2 block text-sm text-white">
-                {t('postTime')}
+                {t('postTime')} <span className="text-slate-500 font-normal">(KST)</span>
               </Label>
               <Input
                 id="postTime"
@@ -233,6 +242,7 @@ export default function SettingsPage() {
                 onChange={(e) => update('postTime', e.target.value)}
                 className="w-40 border-slate-700 bg-slate-950 text-slate-200"
               />
+              <p className="mt-2 text-xs text-slate-500">{t('postTimeDesc')}</p>
             </CardContent>
           </Card>
 

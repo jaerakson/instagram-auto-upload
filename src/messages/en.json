@@ -54,7 +54,8 @@
     "generatingImage": "Generating image...",
     "autoAll": "Auto Generate All",
     "autoAllRunning": "Auto generating...",
-    "newPost": "Create New Post"
+    "newPost": "Create New Post",
+    "manualInputHint": "Enter a prompt manually or use AI auto-generate"
   },
   "history": {
     "title": "History",
@@ -121,7 +122,8 @@
     "langEn": "English",
     "langKoEn": "한국어 + English",
     "langJa": "日本語",
-    "langJaKo": "日本語 + 한국어"
+    "langJaKo": "日本語 + 한국어",
+    "postTimeDesc": "Posts will be automatically uploaded at this time (KST)"
   },
   "common": {
     "loading": "Loading...",

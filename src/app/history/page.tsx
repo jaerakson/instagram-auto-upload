@@ -114,7 +114,7 @@ export default function HistoryPage() {
           <TableBody>
             {posts.map((post) => {
               const perf = getPerf(post.mediaId);
-              const imgSrc = post.mediaUrl || post.imageUrl || undefined;
+              const imgSrc = post.imageUrl || undefined;
               return (
                 <TableRow
                   key={post.id}
@@ -138,6 +138,11 @@ export default function HistoryPage() {
                   </TableCell>
                   <TableCell className="max-w-[200px] text-sm text-slate-300">
                     <span className="line-clamp-1">{post.caption}</span>
+                    {post.prompt && (
+                      <span className="line-clamp-1 text-xs text-slate-500 mt-0.5 block font-mono">
+                        {post.prompt}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right text-xs text-slate-400">
                     {new Date(post.date).toLocaleDateString()}
@@ -170,12 +175,22 @@ export default function HistoryPage() {
                 </SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-5">
-                {(selected.mediaUrl || selected.imageUrl) && (
+                {selected.imageUrl && (
                   <img
-                    src={selected.mediaUrl || selected.imageUrl}
+                    src={selected.imageUrl}
                     alt=""
                     className="w-full rounded-xl object-cover"
                   />
+                )}
+                {selected.mediaUrl && (
+                  <a
+                    href={selected.mediaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    Instagram에서 보기 →
+                  </a>
                 )}
                 <div>
                   <p className="mb-1 text-xs font-medium text-slate-500">{t('fullCaption')}</p>
@@ -184,9 +199,9 @@ export default function HistoryPage() {
                   </p>
                   <p className="mt-1 text-sm text-purple-400">{selected.hashtags}</p>
                 </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-slate-500">{t('prompt')}</p>
-                  <p className="text-sm text-slate-300 font-mono">{selected.prompt}</p>
+                <div className="rounded-lg border border-slate-700/50 bg-slate-950 p-3">
+                  <p className="mb-1.5 text-xs font-medium text-purple-400">{t('prompt')}</p>
+                  <p className="text-sm text-slate-300 font-mono leading-relaxed">{selected.prompt}</p>
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-slate-500">{t('trendReport')}</p>

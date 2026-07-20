@@ -17,7 +17,7 @@ export class InstagramService {
     return res.json() as Promise<T>;
   }
 
-  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string; mediaUrl: string }> {
+  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -49,18 +49,20 @@ export class InstagramService {
           },
         );
 
-        // Step 3: Fetch permalink
+        // Step 3: Fetch permalink and media_url (actual image URL)
         let mediaUrl = '';
+        let instagramImageUrl = '';
         try {
-          const mediaInfo = await this.request<{ permalink?: string }>(
-            `${this.baseUrl}/${published.id}?fields=permalink&access_token=${this.accessToken}`,
+          const mediaInfo = await this.request<{ permalink?: string; media_url?: string }>(
+            `${this.baseUrl}/${published.id}?fields=permalink,media_url&access_token=${this.accessToken}`,
           );
           mediaUrl = mediaInfo.permalink || '';
+          instagramImageUrl = mediaInfo.media_url || '';
         } catch {
-          // Non-critical: continue without permalink
+          // Non-critical: continue without permalink/media_url
         }
 
-        return { mediaId: published.id, mediaUrl };
+        return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         if (attempt < maxRetries) {
@@ -70,6 +72,13 @@ export class InstagramService {
     }
 
     throw new Error(`Upload failed after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
+  async getMediaUrl(mediaId: string): Promise<string> {
+    const res = await this.request<{ media_url?: string }>(
+      `${this.baseUrl}/${mediaId}?fields=media_url&access_token=${this.accessToken}`,
+    );
+    return res.media_url || '';
   }
 
   async getMediaInsights(mediaId: string): Promise<{

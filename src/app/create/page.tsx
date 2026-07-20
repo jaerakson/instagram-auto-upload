@@ -273,7 +273,7 @@ export default function CreatePage() {
           prompt: generatedPrompt.trim(),
           caption: generatedCaption,
           hashtags: generatedHashtags,
-          imageUrl: imageResult.imageUrl,
+          imageUrl: uploadJson.data.imageUrl || imageResult.imageUrl,
           mediaId: uploadJson.data.mediaId,
           mediaUrl: uploadJson.data.mediaUrl || '',
           status: 'published',
@@ -408,7 +408,7 @@ export default function CreatePage() {
               prompt: prompt.trim(),
               caption: editCaption,
               hashtags: editHashtags,
-              imageUrl: imageStep.imageUrl,
+              imageUrl: json.data.imageUrl || imageStep.imageUrl,
               mediaId: json.data.mediaId,
               mediaUrl: json.data.mediaUrl || '',
               status: 'published',
@@ -546,10 +546,39 @@ export default function CreatePage() {
                 </div>
               </CardHeader>
 
-              {/* Step 1: Trend / Prompt input — idle or error: show AI button only */}
+              {/* Step 1: Trend / Prompt input — idle or error: manual input + AI auto */}
               {step === 'trend' && (pipelineStep.status === 'idle' || pipelineStep.status === 'error') && (
                 <CardContent className="border-t border-slate-800 pt-4 space-y-3">
-                  <p className="text-xs text-slate-500">AI 자동 생성 버튼을 클릭하면 트렌드 분석 후 프롬프트와 스타일이 자동으로 채워집니다.</p>
+                  <p className="text-xs text-slate-500">{t('manualInputHint')}</p>
+                  <div>
+                    <label className="mb-1.5 block text-xs text-slate-500">{t('promptLabel')}</label>
+                    <Input
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder={t('promptPlaceholder')}
+                      className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs text-slate-500">{t('styleLabel')}</label>
+                    <Input
+                      value={style}
+                      onChange={(e) => setStyle(e.target.value)}
+                      placeholder={t('stylePlaceholder')}
+                      className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!prompt.trim()}
+                      onClick={() => runStep(0)}
+                      className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
+                    >
+                      {t('confirm')}
+                    </Button>
+                    <span className="text-xs text-slate-600">또는</span>
+                  </div>
                 </CardContent>
               )}
 

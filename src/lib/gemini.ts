@@ -198,18 +198,19 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
 
     const buffer = Buffer.from(base64Image, 'base64');
 
-    // Delete previous images to keep only the latest one
-    const { blobs } = await list({ prefix: 'insta-' });
-    if (blobs.length > 0) {
-      await del(blobs.map((b) => b.url));
-    }
-
-    // Upload to Vercel Blob for public URL
+    // Upload to Vercel Blob for public URL first
     const filename = `insta-${Date.now()}.png`;
     const { url } = await put(filename, buffer, {
       access: 'public',
       contentType: 'image/png',
     });
+
+    // Delete previous images only after new one is safely stored
+    const { blobs } = await list({ prefix: 'insta-' });
+    const oldBlobs = blobs.filter((b) => b.url !== url);
+    if (oldBlobs.length > 0) {
+      await del(oldBlobs.map((b) => b.url));
+    }
 
     return { imageUrl: url };
   }

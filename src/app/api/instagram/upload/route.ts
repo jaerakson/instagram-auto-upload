@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
     const instagramService = await getInstagramService();
     const result = await instagramService.uploadPhoto(imageUrl, caption);
-    return NextResponse.json<ApiResponse<{ mediaId: string; mediaUrl: string }>>({ success: true, data: result });
+    return NextResponse.json<ApiResponse<{ mediaId: string; mediaUrl: string; imageUrl: string }>>({ success: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json<ApiResponse>({ success: false, error: message }, { status: 500 });

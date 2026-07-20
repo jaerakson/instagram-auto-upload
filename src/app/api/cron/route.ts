@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getInstagramService } from '@/lib/services';
+import { sheetsService } from '@/lib/google-sheets';
 import { setCredential, clearCache } from '@/lib/credential-manager';
 import type { ApiResponse } from '@/types';
+
+function getKSTHour(): number {
+  const now = new Date();
+  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  return kst.getHours();
+}
 
 async function refreshInstagramToken(): Promise<{ refreshed: boolean; expiresIn?: number }> {
   try {
@@ -27,23 +34,41 @@ export async function GET(request: Request) {
       );
     }
 
+    // Check autoMode and postTime from settings
+    const settings = await sheetsService.getSettings();
+
+    if (!settings.autoMode) {
+      return NextResponse.json<ApiResponse>({
+        success: true,
+        data: { skipped: true, reason: 'Auto mode is OFF' },
+      });
+    }
+
+    // Compare current KST hour with postTime setting (e.g. "19:00" → 19)
+    const scheduledHour = parseInt(settings.postTime.split(':')[0], 10);
+    const currentKSTHour = getKSTHour();
+
+    if (currentKSTHour !== scheduledHour) {
+      return NextResponse.json<ApiResponse>({
+        success: true,
+        data: {
+          skipped: true,
+          reason: `Not scheduled time (current KST: ${currentKSTHour}:00, scheduled: ${settings.postTime})`,
+        },
+      });
+    }
+
     // Step 1: Refresh Instagram token (extends 60 days from now)
     const tokenResult = await refreshInstagramToken();
 
     // Step 2: Get caption language setting
-    let language = 'en';
-    try {
-      const settings = await import('@/lib/google-sheets').then((m) => m.sheetsService.getSettings());
-      language = settings.captionLanguage || settings.language || 'en';
-    } catch {
-      // Default to English
-    }
+    const language = settings.captionLanguage || settings.language || 'en';
 
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000';
 
-    // Step 3: Collect performance insights (non-blocking — failures don't stop pipeline)
+    // Step 3: Collect performance insights (non-blocking)
     let insightsResult: { collected?: number; error?: string } = {};
     try {
       const insightsRes = await fetch(`${baseUrl}/api/instagram/collect-insights`, {
@@ -76,6 +101,8 @@ export async function GET(request: Request) {
       ...data,
       tokenRefresh: tokenResult,
       insightsCollection: insightsResult,
+      scheduledTime: settings.postTime,
+      executedAtKST: `${currentKSTHour}:00`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

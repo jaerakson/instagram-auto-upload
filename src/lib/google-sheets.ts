@@ -193,14 +193,16 @@ export class GoogleSheetsService {
       if (row[0]) settingsMap.set(row[0], row[1] || '');
     }
 
+    const toBool = (v: string | undefined) => v?.toLowerCase() === 'true';
+
     return {
-      autoMode: settingsMap.get('autoMode') === 'true',
+      autoMode: toBool(settingsMap.get('autoMode')),
       postTime: settingsMap.get('postTime') || '19:00',
       language: (settingsMap.get('language') || 'ko') as 'ko' | 'en',
       captionLanguage: (settingsMap.get('captionLanguage') || 'en') as AppSettings['captionLanguage'],
-      instagramConnected: settingsMap.get('instagramConnected') === 'true',
-      googleSheetsConnected: settingsMap.get('googleSheetsConnected') === 'true',
-      geminiConnected: settingsMap.get('geminiConnected') === 'true',
+      instagramConnected: toBool(settingsMap.get('instagramConnected')),
+      googleSheetsConnected: toBool(settingsMap.get('googleSheetsConnected')),
+      geminiConnected: toBool(settingsMap.get('geminiConnected')),
     };
   }
 
@@ -220,7 +222,7 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
       range: `${SHEET_SETTINGS}!A2:B8`,
-      valueInputOption: 'USER_ENTERED',
+      valueInputOption: 'RAW',
       requestBody: { values: rows },
     });
   }

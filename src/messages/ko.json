@@ -54,7 +54,8 @@
     "generatingImage": "이미지 생성 중...",
     "autoAll": "전체 자동 생성",
     "autoAllRunning": "자동 생성 중...",
-    "newPost": "새 게시물 만들기"
+    "newPost": "새 게시물 만들기",
+    "manualInputHint": "직접 프롬프트를 입력하거나 AI 자동 생성을 사용하세요"
   },
   "history": {
     "title": "작업 내역",
@@ -121,7 +122,8 @@
     "langEn": "English",
     "langKoEn": "한국어 + English",
     "langJa": "日本語",
-    "langJaKo": "日本語 + 한국어"
+    "langJaKo": "日本語 + 한국어",
+    "postTimeDesc": "한국 시간(KST) 기준으로 해당 시간에 자동 업로드됩니다"
   },
   "common": {
     "loading": "로딩 중...",
