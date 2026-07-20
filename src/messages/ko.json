@@ -38,7 +38,20 @@
     "autoGenerate": "AI 자동 생성",
     "autoGenerating": "생성 중...",
     "confirm": "확인",
-    "trendAnalysis": "트렌드 분석"
+    "trendAnalysis": "트렌드 분석",
+    "generateCaption": "AI 캡션 생성",
+    "generatingCaption": "캡션 생성 중...",
+    "regenerateCaption": "캡션 재작성",
+    "regenerateHashtags": "해시태그 재작성",
+    "regenerating": "재작성 중...",
+    "captionLanguage": "게시글 언어",
+    "langKo": "한국어",
+    "langEn": "English",
+    "langKoEn": "한국어 + English",
+    "langJa": "日本語",
+    "langJaKo": "日本語 + 한국어",
+    "imagePreview": "이미지 미리보기",
+    "generatingImage": "이미지 생성 중..."
   },
   "history": {
     "title": "작업 내역",

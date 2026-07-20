@@ -38,7 +38,20 @@
     "autoGenerate": "AI Auto Generate",
     "autoGenerating": "Generating...",
     "confirm": "Confirm",
-    "trendAnalysis": "Trend Analysis"
+    "trendAnalysis": "Trend Analysis",
+    "generateCaption": "AI Generate Caption",
+    "generatingCaption": "Generating caption...",
+    "regenerateCaption": "Regenerate Caption",
+    "regenerateHashtags": "Regenerate Hashtags",
+    "regenerating": "Regenerating...",
+    "captionLanguage": "Caption Language",
+    "langKo": "한국어",
+    "langEn": "English",
+    "langKoEn": "한국어 + English",
+    "langJa": "日本語",
+    "langJaKo": "日本語 + 한국어",
+    "imagePreview": "Image Preview",
+    "generatingImage": "Generating image..."
   },
   "history": {
     "title": "History",

@@ -16,8 +16,19 @@ import {
   XCircle,
   AlertCircle,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import type { PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+
+type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
+
+const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
+  { value: 'ko', labelKey: 'langKo' },
+  { value: 'en', labelKey: 'langEn' },
+  { value: 'ko+en', labelKey: 'langKoEn' },
+  { value: 'ja', labelKey: 'langJa' },
+  { value: 'ja+ko', labelKey: 'langJaKo' },
+];
 
 const steps = [
   { step: 'trend' as const, icon: TrendingUp },
@@ -50,7 +61,12 @@ export default function CreatePage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [trendReport, setTrendReport] = useState('');
+  const [captionLang, setCaptionLang] = useState<CaptionLanguage>('en');
+  const [generatingCaption, setGeneratingCaption] = useState(false);
+  const [regeneratingCaption, setRegeneratingCaption] = useState(false);
+  const [regeneratingHashtags, setRegeneratingHashtags] = useState(false);
 
+  // AI auto-generate: trend analysis + prompt generation → auto-complete trend step
   async function handleAutoGenerate() {
     setGeneratingPrompt(true);
     setErrorMsg('');
@@ -61,6 +77,20 @@ export default function CreatePage() {
       setPrompt(json.data.prompt);
       setStyle(json.data.style);
       if (json.data.trendReport) setTrendReport(json.data.trendReport);
+
+      // Auto-complete trend step so image button becomes active
+      const trendResult: TrendResult = {
+        summary: json.data.trendReport || `Style: ${json.data.style}`,
+        topStyles: json.data.style ? json.data.style.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        keywords: json.data.prompt.split(' ').filter((w: string) => w.length > 3),
+        hashtags: ['#AIart', '#AIgenerated'],
+        avoidList: [],
+      };
+      setPipeline((prev) => {
+        const next = [...prev];
+        next[0] = { step: 'trend', status: 'complete', result: trendResult };
+        return next;
+      });
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Failed to generate prompt');
     } finally {
@@ -68,14 +98,56 @@ export default function CreatePage() {
     }
   }
 
+  // Generate caption via Gemini
+  async function handleGenerateCaption(mode: 'full' | 'caption_only' | 'hashtags_only' = 'full') {
+    if (mode === 'full') setGeneratingCaption(true);
+    else if (mode === 'caption_only') setRegeneratingCaption(true);
+    else setRegeneratingHashtags(true);
+
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/generate-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          style,
+          language: captionLang,
+          mode,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Caption generation failed');
+
+      if (mode === 'full' || mode === 'caption_only') {
+        setEditCaption(json.data.caption);
+      }
+      if (mode === 'full' || mode === 'hashtags_only') {
+        setEditHashtags(json.data.hashtags);
+      }
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Failed to generate caption');
+    } finally {
+      setGeneratingCaption(false);
+      setRegeneratingCaption(false);
+      setRegeneratingHashtags(false);
+    }
+  }
+
   function canRun(stepIndex: number) {
     if (stepIndex === 0) {
       return (pipeline[0].status === 'idle' || pipeline[0].status === 'error') && prompt.trim().length > 0;
     }
-    if (stepIndex === 2) {
-      return pipeline[1].status === 'complete' && pipeline[2].status !== 'complete';
+    if (stepIndex === 1) {
+      return pipeline[0].status === 'complete' && (pipeline[1].status === 'idle' || pipeline[1].status === 'error');
     }
-    return pipeline[stepIndex - 1].status === 'complete' && pipeline[stepIndex].status !== 'running';
+    if (stepIndex === 2) {
+      return pipeline[1].status === 'complete' && pipeline[2].status !== 'running';
+    }
+    if (stepIndex === 3) {
+      return pipeline[2].status === 'complete' && pipeline[3].status !== 'running';
+    }
+    return false;
   }
 
   async function runStep(stepIndex: number) {
@@ -91,7 +163,7 @@ export default function CreatePage() {
       switch (step) {
         case 'trend': {
           const trendResult: TrendResult = {
-            summary: `Prompt: "${prompt.trim()}"`,
+            summary: trendReport || `Prompt: "${prompt.trim()}"`,
             topStyles: style ? style.split(',').map((s) => s.trim()).filter(Boolean) : [],
             keywords: prompt.split(' ').filter((w) => w.length > 3),
             hashtags: ['#AIart', '#AIgenerated'],
@@ -108,7 +180,7 @@ export default function CreatePage() {
           const res = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt.trim(), imageSize: 'square_hd' }),
+            body: JSON.stringify({ prompt: prompt.trim(), aspectRatio: '1:1' }),
           });
           const json = await res.json();
           if (!json.success) throw new Error(json.error || 'Image generation failed');
@@ -116,7 +188,7 @@ export default function CreatePage() {
             imageUrl: json.data.imageUrl,
             prompt: prompt.trim(),
             designIntent: style || '',
-            model: 'imagen-3.0-generate-002',
+            model: 'imagen-4.0-generate-001',
             imageSize: '1:1',
           };
           setPipeline((prev) => {
@@ -131,7 +203,7 @@ export default function CreatePage() {
             caption: editCaption,
             hashtags: editHashtags,
             fullText: `${editCaption}\n\n${editHashtags}`.trim(),
-            strategy: 'manual',
+            strategy: 'confirmed',
           };
           setPipeline((prev) => {
             const next = [...prev];
@@ -155,7 +227,6 @@ export default function CreatePage() {
             mediaId: json.data.mediaId,
             postedAt: new Date().toISOString(),
           };
-          // Save to Google Sheets
           await fetch('/api/sheets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -169,7 +240,7 @@ export default function CreatePage() {
               mediaId: json.data.mediaId,
               mediaUrl: '',
               status: 'published',
-              trendReport: '',
+              trendReport: trendReport || '',
               style: style || '',
             }),
           });
@@ -245,6 +316,20 @@ export default function CreatePage() {
                     >
                       {t('confirm')}
                     </Button>
+                  ) : step === 'image' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!isRunnable}
+                      onClick={() => runStep(i)}
+                      className="border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                    >
+                      {pipelineStep.status === 'running' ? (
+                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('generatingImage')}</>
+                      ) : (
+                        t('run')
+                      )}
+                    </Button>
                   ) : (
                     <Button
                       size="sm"
@@ -262,20 +347,9 @@ export default function CreatePage() {
                 </div>
               </CardHeader>
 
-              {/* Step 1: Prompt input (always visible when idle or error) */}
+              {/* Step 1: Trend / Prompt input */}
               {step === 'trend' && (pipelineStep.status === 'idle' || pipelineStep.status === 'error') && (
                 <CardContent className="border-t border-slate-800 pt-4 space-y-3">
-                  {trendReport && (
-                    <div className="rounded-lg border border-indigo-800/50 bg-indigo-950/30 p-3">
-                      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-indigo-400">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        <span>{t('trendAnalysis')}</span>
-                      </div>
-                      <p className="text-sm leading-relaxed text-slate-300" style={{ whiteSpace: 'pre-wrap' }}>
-                        {trendReport}
-                      </p>
-                    </div>
-                  )}
                   <div className="flex justify-end">
                     <Button
                       size="sm"
@@ -311,38 +385,71 @@ export default function CreatePage() {
                 </CardContent>
               )}
 
+              {/* Step 1: Trend result (after auto-generate completes) */}
+              {step === 'trend' && pipelineStep.status === 'complete' && pipelineStep.result && (
+                <CardContent className="border-t border-slate-800 pt-4">
+                  <TrendResultView result={pipelineStep.result as TrendResult} />
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs text-slate-500">{t('promptLabel')}</label>
+                      <p className="text-sm text-slate-300 bg-slate-950 rounded-lg px-3 py-2 border border-slate-700">{prompt}</p>
+                    </div>
+                    {style && (
+                      <div>
+                        <label className="mb-1.5 block text-xs text-slate-500">{t('styleLabel')}</label>
+                        <p className="text-sm text-slate-400">{style}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              )}
+
+              {/* Step 2: Image result with preview */}
+              {step === 'image' && pipelineStep.status === 'complete' && pipelineStep.result && (
+                <CardContent className="border-t border-slate-800 pt-4">
+                  <ImageResultView result={pipelineStep.result as ImageResult} />
+                </CardContent>
+              )}
+
               {/* Step 3: Caption editor (visible after image generation) */}
               {step === 'caption' && pipeline[1].status === 'complete' && pipelineStep.status !== 'complete' && (
                 <CardContent className="border-t border-slate-800 pt-4">
-                  <CaptionResultView
+                  <CaptionEditor
                     caption={editCaption}
                     hashtags={editHashtags}
+                    captionLang={captionLang}
                     onCaptionChange={setEditCaption}
                     onHashtagsChange={setEditHashtags}
+                    onLanguageChange={setCaptionLang}
+                    onGenerateCaption={handleGenerateCaption}
+                    generatingCaption={generatingCaption}
+                    regeneratingCaption={regeneratingCaption}
+                    regeneratingHashtags={regeneratingHashtags}
+                    hasPrompt={prompt.trim().length > 0}
                   />
                 </CardContent>
               )}
 
-              {/* Completed results */}
-              {pipelineStep.status === 'complete' && pipelineStep.result && (
+              {/* Step 3: Caption confirmed */}
+              {step === 'caption' && pipelineStep.status === 'complete' && (
                 <CardContent className="border-t border-slate-800 pt-4">
-                  {step === 'trend' && (
-                    <TrendResultView result={pipelineStep.result as TrendResult} />
-                  )}
-                  {step === 'image' && (
-                    <ImageResultView result={pipelineStep.result as ImageResult} />
-                  )}
-                  {step === 'caption' && (
-                    <CaptionResultView
-                      caption={editCaption}
-                      hashtags={editHashtags}
-                      onCaptionChange={setEditCaption}
-                      onHashtagsChange={setEditHashtags}
-                    />
-                  )}
-                  {step === 'upload' && (
-                    <UploadResultView result={pipelineStep.result as UploadResult} />
-                  )}
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">{t('caption')}</label>
+                      <p className="text-slate-300 whitespace-pre-wrap">{editCaption}</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">{t('hashtags')}</label>
+                      <p className="text-purple-400">{editHashtags}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+
+              {/* Step 4: Upload result */}
+              {step === 'upload' && pipelineStep.status === 'complete' && pipelineStep.result && (
+                <CardContent className="border-t border-slate-800 pt-4">
+                  <UploadResultView result={pipelineStep.result as UploadResult} />
                 </CardContent>
               )}
 
@@ -383,59 +490,144 @@ function ImageResultView({ result }: { result: ImageResult }) {
   const t = useTranslations('create');
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
-      <div className="shrink-0 overflow-hidden rounded-xl">
+      <div className="shrink-0 overflow-hidden rounded-xl border border-slate-700">
         <img
           src={result.imageUrl}
           alt="Generated"
-          className="h-48 w-48 object-cover"
-          width={192}
-          height={192}
+          className="h-64 w-64 object-cover"
+          width={256}
+          height={256}
         />
       </div>
       <div className="space-y-2 text-sm">
         <div>
           <span className="text-slate-500">{t('promptUsed')}:</span>
-          <p className="text-slate-300">{result.prompt}</p>
+          <p className="text-slate-300 mt-1">{result.prompt}</p>
         </div>
-        <div>
-          <span className="text-slate-500">{t('designIntent')}:</span>
-          <p className="text-slate-300">{result.designIntent}</p>
-        </div>
+        {result.designIntent && (
+          <div>
+            <span className="text-slate-500">{t('designIntent')}:</span>
+            <p className="text-slate-300 mt-1">{result.designIntent}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function CaptionResultView({
+function CaptionEditor({
   caption,
   hashtags,
+  captionLang,
   onCaptionChange,
   onHashtagsChange,
+  onLanguageChange,
+  onGenerateCaption,
+  generatingCaption,
+  regeneratingCaption,
+  regeneratingHashtags,
+  hasPrompt,
 }: {
   caption: string;
   hashtags: string;
+  captionLang: CaptionLanguage;
   onCaptionChange: (v: string) => void;
   onHashtagsChange: (v: string) => void;
+  onLanguageChange: (v: CaptionLanguage) => void;
+  onGenerateCaption: (mode: 'full' | 'caption_only' | 'hashtags_only') => void;
+  generatingCaption: boolean;
+  regeneratingCaption: boolean;
+  regeneratingHashtags: boolean;
+  hasPrompt: boolean;
 }) {
   const t = useTranslations('create');
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Language selector + AI generate */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-500">{t('captionLanguage')}</label>
+          <select
+            value={captionLang}
+            onChange={(e) => onLanguageChange(e.target.value as CaptionLanguage)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+            ))}
+          </select>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onGenerateCaption('full')}
+          disabled={generatingCaption || !hasPrompt}
+          className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50"
+        >
+          {generatingCaption ? (
+            <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('generatingCaption')}</>
+          ) : (
+            <><Sparkles className="mr-1.5 h-3.5 w-3.5" />{t('generateCaption')}</>
+          )}
+        </Button>
+      </div>
+
+      {/* Caption field + regenerate */}
       <div>
-        <label className="mb-1 block text-xs text-slate-500">{t('caption')}</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-slate-500">{t('caption')}</label>
+          {caption && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onGenerateCaption('caption_only')}
+              disabled={regeneratingCaption || !hasPrompt}
+              className="h-6 px-2 text-xs text-slate-400 hover:text-slate-200"
+            >
+              {regeneratingCaption ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1 h-3 w-3" />
+              )}
+              {t('regenerateCaption')}
+            </Button>
+          )}
+        </div>
         <textarea
           value={caption}
           onChange={(e) => onCaptionChange(e.target.value)}
           className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
-          rows={2}
+          rows={4}
+          placeholder="AI 캡션 생성 버튼을 누르거나 직접 입력하세요"
         />
       </div>
+
+      {/* Hashtags field + regenerate */}
       <div>
-        <label className="mb-1 block text-xs text-slate-500">{t('hashtags')}</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-slate-500">{t('hashtags')}</label>
+          {hashtags && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onGenerateCaption('hashtags_only')}
+              disabled={regeneratingHashtags || !hasPrompt}
+              className="h-6 px-2 text-xs text-slate-400 hover:text-slate-200"
+            >
+              {regeneratingHashtags ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1 h-3 w-3" />
+              )}
+              {t('regenerateHashtags')}
+            </Button>
+          )}
+        </div>
         <textarea
           value={hashtags}
           onChange={(e) => onHashtagsChange(e.target.value)}
           className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
           rows={2}
+          placeholder="#AIart #cinematicportrait ..."
         />
       </div>
     </div>

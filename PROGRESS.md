@@ -1,0 +1,21 @@
+## 2026-07-20 15:00 (집)
+- 브랜치: main
+- 완료:
+  - Vercel Blob Store 연결 (instagram-auto-upload, Public, ICN1)
+  - Gemini Imagen 3 → Imagen 4 모델 업그레이드
+  - Instagram API base URL 수정 (graph.facebook.com → graph.instagram.com/v25.0)
+  - Instagram 토큰 자동 갱신 기능 추가 (cron 실행마다 60일 연장)
+  - 파이프라인 Phase 1~4 전체 실행 성공
+  - 첫 번째 게시물 업로드 완료 (Media ID: 18082956752443609)
+- 현재 상태: 파이프라인 정상 동작. 첫 게시물 업로드됨.
+- 다음 할 일:
+  - Phase 5 성과 분석 (게시 후 24-48시간 경과 후 실행)
+  - Vercel 배포 후 cron 자동 실행 테스트
+  - Google Sheets 게시기록 시트 연동 확인
+  - 두 번째 게시물 생성 (다른 스타일로 A/B 테스트)
+- 관련 파일/커밋: 5462cd1
+  - src/lib/gemini.ts (Imagen 4, 헤더 인증, 트렌드 분석)
+  - src/lib/instagram.ts (graph.instagram.com/v25.0, refreshToken)
+  - src/app/api/cron/route.ts (토큰 자동 갱신)
+  - .env.local (BLOB_READ_WRITE_TOKEN, BLOB_STORE_ID 추가)
+- 푸시 여부: origin/main 에 푸시 완료

@@ -213,4 +213,92 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
 
     return { imageUrl: url };
   }
+
+  async generateCaption(options: {
+    prompt: string;
+    style: string;
+    language: 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
+    trendContext?: TrendResult;
+    mode: 'full' | 'caption_only' | 'hashtags_only';
+  }): Promise<{ caption: string; hashtags: string }> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
+
+    const languageToneMap: Record<string, string> = {
+      ko: 'Write in Korean with a sentimental, emotional tone (감성적인 톤).',
+      en: 'Write in English with an editorial, refined tone.',
+      'ko+en': 'Write the main body in Korean (감성적 톤), then add one natural English line at the end. Mix naturally.',
+      ja: 'Write in Japanese with a polite yet emotional tone (丁寧で感性的なトーン).',
+      'ja+ko': 'Write the main body in Japanese (感性的なトーン), then add one natural Korean line at the end.',
+    };
+
+    const modeInstruction: Record<string, string> = {
+      full: 'Generate both a caption and exactly 5 hashtags.',
+      caption_only: 'Generate only a caption. Return empty string for hashtags.',
+      hashtags_only: 'Generate only exactly 5 hashtags. Return empty string for caption.',
+    };
+
+    let trendSection = '';
+    if (options.trendContext) {
+      trendSection = `
+Current trending context to weave into the caption naturally:
+- Top styles: ${options.trendContext.topStyles.join(', ')}
+- Trending keywords: ${options.trendContext.keywords.join(', ')}
+- Styles to AVOID: ${options.trendContext.avoidList.join(', ')}${options.trendContext.performanceFeedback ? `\n- Performance insights: ${options.trendContext.performanceFeedback}` : ''}
+
+Incorporate trending keywords naturally into the caption. Do NOT just list them.`;
+    }
+
+    const systemInstruction = `You are an expert Instagram caption writer for AI-generated art posts.
+
+${languageToneMap[options.language]}
+
+${modeInstruction[options.mode]}
+
+Rules:
+- The caption should complement the image described by the prompt, not describe it literally
+- Keep the caption concise (2-4 lines max) and engaging
+- Hashtags must be exactly 5 tags, relevant to AI art and the image style (2026 Instagram policy)
+- Do NOT use generic hashtags like #ai or #photo alone — be specific
+- The tone should feel personal and authentic, not like marketing copy${trendSection}
+
+Image prompt: "${options.prompt}"
+Image style: "${options.style}"
+
+Respond ONLY in this exact JSON format (no markdown, no code blocks):
+{"caption": "your caption here", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5"}`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ parts: [{ text: `Write an Instagram caption for this AI art post. Prompt: "${options.prompt}", Style: "${options.style}"` }] }],
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      throw new Error(error.error?.message || `Gemini API error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error('No response from Gemini');
+    }
+
+    const parsed = this.parseGeminiJson<{ caption: string; hashtags: string }>(text);
+    if (options.mode === 'full' && (!parsed.caption || !parsed.hashtags)) {
+      throw new Error('Gemini caption response missing required fields');
+    }
+    return {
+      caption: parsed.caption || '',
+      hashtags: parsed.hashtags || '',
+    };
+  }
 }
