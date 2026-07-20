@@ -18,6 +18,7 @@ import {
   Sparkles,
   RefreshCw,
   Play,
+  RotateCcw,
 } from 'lucide-react';
 import type { CaptionLanguage, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 
@@ -65,6 +66,19 @@ export default function CreatePage() {
   const [regeneratingCaption, setRegeneratingCaption] = useState(false);
   const [regeneratingHashtags, setRegeneratingHashtags] = useState(false);
   const [autoAllRunning, setAutoAllRunning] = useState(false);
+
+  const isAllComplete = pipeline.every((s) => s.status === 'complete');
+  const isUploadComplete = pipeline[3].status === 'complete';
+
+  function handleReset() {
+    setPipeline(steps.map(({ step }) => ({ step, status: 'idle' })));
+    setPrompt('');
+    setStyle('');
+    setEditCaption('');
+    setEditHashtags('');
+    setTrendReport('');
+    setErrorMsg('');
+  }
 
   // AI auto-generate: trend analysis + prompt generation → auto-complete trend step
   async function handleAutoGenerate() {
@@ -247,6 +261,7 @@ export default function CreatePage() {
       const uploadResult: UploadResult = {
         success: true,
         mediaId: uploadJson.data.mediaId,
+        mediaUrl: uploadJson.data.mediaUrl || '',
         postedAt: new Date().toISOString(),
       };
       await fetch('/api/sheets', {
@@ -260,7 +275,7 @@ export default function CreatePage() {
           hashtags: generatedHashtags,
           imageUrl: imageResult.imageUrl,
           mediaId: uploadJson.data.mediaId,
-          mediaUrl: '',
+          mediaUrl: uploadJson.data.mediaUrl || '',
           status: 'published',
           trendReport: generatedTrendReport,
           style: generatedStyle || '',
@@ -381,6 +396,7 @@ export default function CreatePage() {
           const uploadResult: UploadResult = {
             success: true,
             mediaId: json.data.mediaId,
+            mediaUrl: json.data.mediaUrl || '',
             postedAt: new Date().toISOString(),
           };
           await fetch('/api/sheets', {
@@ -394,7 +410,7 @@ export default function CreatePage() {
               hashtags: editHashtags,
               imageUrl: imageStep.imageUrl,
               mediaId: json.data.mediaId,
-              mediaUrl: '',
+              mediaUrl: json.data.mediaUrl || '',
               status: 'published',
               trendReport: trendReport || '',
               style: style || '',
@@ -621,6 +637,17 @@ export default function CreatePage() {
           );
         })}
       </div>
+
+      {(isAllComplete || isUploadComplete) && (
+        <Button
+          size="lg"
+          onClick={handleReset}
+          className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-lg font-semibold hover:from-emerald-600 hover:to-teal-600 h-14 rounded-xl shadow-lg shadow-emerald-500/20"
+        >
+          <RotateCcw className="mr-2 h-5 w-5" />
+          {t('newPost')}
+        </Button>
+      )}
     </div>
   );
 }

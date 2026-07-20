@@ -53,7 +53,8 @@
     "imagePreview": "Image Preview",
     "generatingImage": "Generating image...",
     "autoAll": "Auto Generate All",
-    "autoAllRunning": "Auto generating..."
+    "autoAllRunning": "Auto generating...",
+    "newPost": "Create New Post"
   },
   "history": {
     "title": "History",

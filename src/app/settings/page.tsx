@@ -92,6 +92,16 @@ export default function SettingsPage() {
         const json = await res.json();
         if (json.success && json.data) {
           setCredentials(json.data);
+          const creds = json.data as CredentialStatus[];
+          const hasToken = creds.find((c) => c.key === 'INSTAGRAM_ACCESS_TOKEN')?.configured ?? false;
+          const hasUserId = creds.find((c) => c.key === 'INSTAGRAM_USER_ID')?.configured ?? false;
+          const hasGemini = creds.find((c) => c.key === 'GEMINI_KEY')?.configured ?? false;
+          setSettings((prev) => ({
+            ...prev,
+            instagramConnected: hasToken && hasUserId,
+            geminiConnected: hasGemini,
+            googleSheetsConnected: true, // API succeeded → GOOGLE_SHEETS_ID is configured
+          }));
           return;
         }
       }

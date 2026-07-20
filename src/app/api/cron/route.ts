@@ -39,14 +39,31 @@ export async function GET(request: Request) {
       // Default to English
     }
 
-    // Step 3: Trigger pipeline in auto mode (full AI pipeline)
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000';
 
+    // Step 3: Collect performance insights (non-blocking — failures don't stop pipeline)
+    let insightsResult: { collected?: number; error?: string } = {};
+    try {
+      const insightsRes = await fetch(`${baseUrl}/api/instagram/collect-insights`, {
+        method: 'POST',
+      });
+      const insightsData = await insightsRes.json();
+      insightsResult = insightsData.success
+        ? { collected: insightsData.data?.collected ?? 0 }
+        : { error: insightsData.error };
+    } catch (error) {
+      insightsResult = { error: error instanceof Error ? error.message : 'Insights collection failed' };
+    }
+
+    // Step 4: Trigger pipeline in auto mode (full AI pipeline)
     const res = await fetch(`${baseUrl}/api/pipeline`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+      },
       body: JSON.stringify({
         mode: 'auto',
         language,
@@ -57,6 +74,7 @@ export async function GET(request: Request) {
     return NextResponse.json<ApiResponse>({
       ...data,
       tokenRefresh: tokenResult,
+      insightsCollection: insightsResult,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

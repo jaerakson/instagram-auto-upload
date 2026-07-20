@@ -17,7 +17,7 @@ export class InstagramService {
     return res.json() as Promise<T>;
   }
 
-  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string }> {
+  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string; mediaUrl: string }> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -49,7 +49,18 @@ export class InstagramService {
           },
         );
 
-        return { mediaId: published.id };
+        // Step 3: Fetch permalink
+        let mediaUrl = '';
+        try {
+          const mediaInfo = await this.request<{ permalink?: string }>(
+            `${this.baseUrl}/${published.id}?fields=permalink&access_token=${this.accessToken}`,
+          );
+          mediaUrl = mediaInfo.permalink || '';
+        } catch {
+          // Non-critical: continue without permalink
+        }
+
+        return { mediaId: published.id, mediaUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         if (attempt < maxRetries) {

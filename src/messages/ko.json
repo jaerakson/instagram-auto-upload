@@ -53,7 +53,8 @@
     "imagePreview": "이미지 미리보기",
     "generatingImage": "이미지 생성 중...",
     "autoAll": "전체 자동 생성",
-    "autoAllRunning": "자동 생성 중..."
+    "autoAllRunning": "자동 생성 중...",
+    "newPost": "새 게시물 만들기"
   },
   "history": {
     "title": "작업 내역",

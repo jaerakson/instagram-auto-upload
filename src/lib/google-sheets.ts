@@ -144,6 +144,42 @@ export class GoogleSheetsService {
     });
   }
 
+  async upsertPerformance(record: PerformanceRecord): Promise<void> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_PERFORMANCE}!A2:A`,
+    });
+    const mediaIds = res.data.values || [];
+    const rowIndex = mediaIds.findIndex((row) => row[0] === record.mediaId);
+
+    const values = [[
+      record.mediaId,
+      record.date,
+      record.likes,
+      record.comments,
+      record.saves,
+      record.reach,
+      record.followersDelta,
+    ]];
+
+    if (rowIndex >= 0) {
+      const rowNumber = rowIndex + 2;
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: `${SHEET_PERFORMANCE}!A${rowNumber}:G${rowNumber}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values },
+      });
+    } else {
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: `${SHEET_PERFORMANCE}!A:G`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values },
+      });
+    }
+  }
+
   // 설정
 
   async getSettings(): Promise<AppSettings> {

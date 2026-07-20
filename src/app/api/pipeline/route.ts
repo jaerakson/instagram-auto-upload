@@ -4,6 +4,14 @@ import { sheetsService } from '@/lib/google-sheets';
 import type { ApiResponse, PostRecord, PipelineStep, PerformanceRecord } from '@/types';
 
 export async function POST(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json<ApiResponse>(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
+
   const steps: PipelineStep[] = [
     { step: 'trend', status: 'idle' },
     { step: 'image', status: 'idle' },
@@ -111,6 +119,7 @@ export async function POST(request: Request) {
         result: {
           success: true,
           mediaId: uploadResult.mediaId,
+          mediaUrl: uploadResult.mediaUrl,
           postedAt: new Date().toISOString(),
         },
       };
@@ -124,7 +133,7 @@ export async function POST(request: Request) {
         hashtags: finalHashtags,
         imageUrl: imageResult.imageUrl,
         mediaId: uploadResult.mediaId,
-        mediaUrl: '',
+        mediaUrl: uploadResult.mediaUrl,
         status: 'published',
         trendReport: finalTrendReport,
         style: finalStyle,
@@ -201,6 +210,7 @@ export async function POST(request: Request) {
         result: {
           success: true,
           mediaId: uploadResult.mediaId,
+          mediaUrl: uploadResult.mediaUrl,
           postedAt: new Date().toISOString(),
         },
       };
@@ -214,7 +224,7 @@ export async function POST(request: Request) {
         hashtags: finalHashtags,
         imageUrl: imageResult.imageUrl,
         mediaId: uploadResult.mediaId,
-        mediaUrl: '',
+        mediaUrl: uploadResult.mediaUrl,
         status: 'published',
         trendReport: finalTrendReport,
         style: finalStyle,
