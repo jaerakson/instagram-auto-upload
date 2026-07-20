@@ -37,7 +37,8 @@
     "stylePlaceholder": "e.g. cyberpunk, anime, surreal",
     "autoGenerate": "AI Auto Generate",
     "autoGenerating": "Generating...",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "trendAnalysis": "Trend Analysis"
   },
   "history": {
     "title": "History",

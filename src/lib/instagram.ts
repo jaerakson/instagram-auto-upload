@@ -1,7 +1,7 @@
 export class InstagramService {
   private accessToken: string;
   private userId: string;
-  private baseUrl = 'https://graph.facebook.com/v21.0';
+  private baseUrl = 'https://graph.instagram.com/v25.0';
 
   constructor(config: { accessToken: string; userId: string }) {
     this.accessToken = config.accessToken;
@@ -111,5 +111,13 @@ export class InstagramService {
       `${this.baseUrl}/${this.userId}?fields=followers_count&access_token=${this.accessToken}`,
     );
     return res.followers_count;
+  }
+
+  async refreshToken(): Promise<{ accessToken: string; expiresIn: number }> {
+    const res = await this.request<{ access_token: string; expires_in: number }>(
+      `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${this.accessToken}`,
+    );
+    this.accessToken = res.access_token;
+    return { accessToken: res.access_token, expiresIn: res.expires_in };
   }
 }

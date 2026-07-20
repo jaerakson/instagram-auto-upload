@@ -37,7 +37,8 @@
     "stylePlaceholder": "e.g. cyberpunk, anime, surreal",
     "autoGenerate": "AI 자동 생성",
     "autoGenerating": "생성 중...",
-    "confirm": "확인"
+    "confirm": "확인",
+    "trendAnalysis": "트렌드 분석"
   },
   "history": {
     "title": "작업 내역",

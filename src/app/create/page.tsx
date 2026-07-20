@@ -49,6 +49,7 @@ export default function CreatePage() {
   const [editHashtags, setEditHashtags] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [trendReport, setTrendReport] = useState('');
 
   async function handleAutoGenerate() {
     setGeneratingPrompt(true);
@@ -59,6 +60,7 @@ export default function CreatePage() {
       if (!json.success) throw new Error(json.error || 'Prompt generation failed');
       setPrompt(json.data.prompt);
       setStyle(json.data.style);
+      if (json.data.trendReport) setTrendReport(json.data.trendReport);
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Failed to generate prompt');
     } finally {
@@ -263,6 +265,17 @@ export default function CreatePage() {
               {/* Step 1: Prompt input (always visible when idle or error) */}
               {step === 'trend' && (pipelineStep.status === 'idle' || pipelineStep.status === 'error') && (
                 <CardContent className="border-t border-slate-800 pt-4 space-y-3">
+                  {trendReport && (
+                    <div className="rounded-lg border border-indigo-800/50 bg-indigo-950/30 p-3">
+                      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-indigo-400">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        <span>{t('trendAnalysis')}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-slate-300" style={{ whiteSpace: 'pre-wrap' }}>
+                        {trendReport}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex justify-end">
                     <Button
                       size="sm"
