@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff } from 'lucide-react';
-import type { AppSettings, CredentialKey, CredentialStatus } from '@/types';
+import type { AppSettings, CaptionLanguage, CredentialKey, CredentialStatus } from '@/types';
 
 interface KeyConfig {
   key: CredentialKey;
@@ -19,10 +19,19 @@ interface KeyConfig {
   color: string;
 }
 
+const CAPTION_LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
+  { value: 'ko', labelKey: 'langKo' },
+  { value: 'en', labelKey: 'langEn' },
+  { value: 'ko+en', labelKey: 'langKoEn' },
+  { value: 'ja', labelKey: 'langJa' },
+  { value: 'ja+ko', labelKey: 'langJaKo' },
+];
+
 const defaultSettings: AppSettings = {
   autoMode: false,
   postTime: '19:00',
   language: 'ko',
+  captionLanguage: 'en',
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -199,21 +208,45 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Upload Time */}
-      <Card className="border-slate-800 bg-slate-900">
-        <CardContent className="p-5">
-          <Label htmlFor="postTime" className="mb-2 block text-sm text-white">
-            {t('postTime')}
-          </Label>
-          <Input
-            id="postTime"
-            type="time"
-            value={settings.postTime}
-            onChange={(e) => update('postTime', e.target.value)}
-            className="w-40 border-slate-700 bg-slate-950 text-slate-200"
-          />
-        </CardContent>
-      </Card>
+      {/* Upload Time & Caption Language — visible only when autoMode is ON */}
+      {settings.autoMode && (
+        <>
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5">
+              <Label htmlFor="postTime" className="mb-2 block text-sm text-white">
+                {t('postTime')}
+              </Label>
+              <Input
+                id="postTime"
+                type="time"
+                value={settings.postTime}
+                onChange={(e) => update('postTime', e.target.value)}
+                className="w-40 border-slate-700 bg-slate-950 text-slate-200"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5">
+              <Label htmlFor="captionLanguage" className="mb-2 block text-sm text-white">
+                {t('captionLanguage')}
+              </Label>
+              <select
+                id="captionLanguage"
+                value={settings.captionLanguage}
+                onChange={(e) => update('captionLanguage', e.target.value as CaptionLanguage)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+              >
+                {CAPTION_LANGUAGE_OPTIONS.map(({ value, labelKey }) => (
+                  <option key={value} value={value}>
+                    {t(labelKey)}
+                  </option>
+                ))}
+              </select>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* API Keys */}
       <Card className="border-slate-800 bg-slate-900">

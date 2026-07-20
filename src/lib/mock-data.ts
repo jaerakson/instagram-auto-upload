@@ -117,6 +117,7 @@ export const mockSettings: AppSettings = {
   autoMode: false,
   postTime: '19:00',
   language: 'ko',
+  captionLanguage: 'en',
   instagramConnected: true,
   googleSheetsConnected: true,
   geminiConnected: true,

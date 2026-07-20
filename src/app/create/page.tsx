@@ -19,9 +19,7 @@ import {
   RefreshCw,
   Play,
 } from 'lucide-react';
-import type { PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
-
-type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
+import type { CaptionLanguage, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 
 const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
   { value: 'ko', labelKey: 'langKo' },
@@ -434,18 +432,32 @@ export default function CreatePage() {
         </div>
       )}
 
-      <Button
-        size="lg"
-        disabled={autoAllRunning || pipeline.some((s) => s.status === 'running')}
-        onClick={handleAutoAll}
-        className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white text-lg font-semibold hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 disabled:opacity-50 h-14 rounded-xl shadow-lg shadow-purple-500/20"
-      >
-        {autoAllRunning ? (
-          <><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('autoAllRunning')}</>
-        ) : (
-          <><Play className="mr-2 h-5 w-5" />{t('autoAll')}</>
-        )}
-      </Button>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('captionLanguage')}</label>
+          <select
+            value={captionLang}
+            onChange={(e) => setCaptionLang(e.target.value as CaptionLanguage)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+            ))}
+          </select>
+        </div>
+        <Button
+          size="lg"
+          disabled={autoAllRunning || pipeline.some((s) => s.status === 'running')}
+          onClick={handleAutoAll}
+          className="flex-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white text-lg font-semibold hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 disabled:opacity-50 h-14 rounded-xl shadow-lg shadow-purple-500/20"
+        >
+          {autoAllRunning ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('autoAllRunning')}</>
+          ) : (
+            <><Play className="mr-2 h-5 w-5" />{t('autoAll')}</>
+          )}
+        </Button>
+      </div>
 
       <div className="space-y-4">
         {steps.map(({ step, icon: Icon }, i) => {

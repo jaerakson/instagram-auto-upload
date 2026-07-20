@@ -224,11 +224,11 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     const languageToneMap: Record<string, string> = {
-      ko: 'Write in Korean with a sentimental, emotional tone (감성적인 톤).',
-      en: 'Write in English with an editorial, refined tone.',
-      'ko+en': 'Write the main body in Korean (감성적 톤), then add one natural English line at the end. Mix naturally.',
-      ja: 'Write in Japanese with a polite yet emotional tone (丁寧で感性的なトーン).',
-      'ja+ko': 'Write the main body in Japanese (感性的なトーン), then add one natural Korean line at the end.',
+      ko: 'Write in Korean with a sentimental, emotional tone (감성적인 톤). Hashtags: use Korean hashtags (e.g. #AI아트 #감성사진).',
+      en: 'Write in English with an editorial, refined tone. Hashtags: use English only (e.g. #AIart #cinematicportrait).',
+      'ko+en': 'Write the main body in Korean (감성적 톤), then add one natural English line at the end. Mix naturally. Hashtags: use English only for global reach (e.g. #AIart #digitalportrait).',
+      ja: 'Write in Japanese with a polite yet emotional tone (丁寧で感性的なトーン). Hashtags: mix Japanese and English (e.g. #AI写真 #cinematicportrait).',
+      'ja+ko': 'Write the main body in Japanese (感性的なトーン), then add one natural Korean line at the end. Hashtags: use English only for global reach (e.g. #AIart #aestheticphoto).',
     };
 
     const modeInstruction: Record<string, string> = {

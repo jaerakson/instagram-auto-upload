@@ -113,7 +113,13 @@
     "deleteConfirm": "정말 삭제하시겠습니까?",
     "configured": "설정됨",
     "notConfigured": "미설정",
-    "saveError": "저장 실패"
+    "saveError": "저장 실패",
+    "captionLanguage": "게시글 언어",
+    "langKo": "한국어",
+    "langEn": "English",
+    "langKoEn": "한국어 + English",
+    "langJa": "日本語",
+    "langJaKo": "日本語 + 한국어"
   },
   "common": {
     "loading": "로딩 중...",

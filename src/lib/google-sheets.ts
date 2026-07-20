@@ -161,6 +161,7 @@ export class GoogleSheetsService {
       autoMode: settingsMap.get('autoMode') === 'true',
       postTime: settingsMap.get('postTime') || '19:00',
       language: (settingsMap.get('language') || 'ko') as 'ko' | 'en',
+      captionLanguage: (settingsMap.get('captionLanguage') || 'en') as AppSettings['captionLanguage'],
       instagramConnected: settingsMap.get('instagramConnected') === 'true',
       googleSheetsConnected: settingsMap.get('googleSheetsConnected') === 'true',
       geminiConnected: settingsMap.get('geminiConnected') === 'true',
@@ -174,6 +175,7 @@ export class GoogleSheetsService {
       ['autoMode', String(merged.autoMode)],
       ['postTime', merged.postTime],
       ['language', merged.language],
+      ['captionLanguage', merged.captionLanguage],
       ['instagramConnected', String(merged.instagramConnected)],
       ['googleSheetsConnected', String(merged.googleSheetsConnected)],
       ['geminiConnected', String(merged.geminiConnected)],
@@ -181,7 +183,7 @@ export class GoogleSheetsService {
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_SETTINGS}!A2:B7`,
+      range: `${SHEET_SETTINGS}!A2:B8`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rows },
     });

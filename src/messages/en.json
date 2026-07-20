@@ -113,7 +113,13 @@
     "deleteConfirm": "Are you sure you want to delete?",
     "configured": "Configured",
     "notConfigured": "Not Configured",
-    "saveError": "Save Failed"
+    "saveError": "Save Failed",
+    "captionLanguage": "Caption Language",
+    "langKo": "한국어",
+    "langEn": "English",
+    "langKoEn": "한국어 + English",
+    "langJa": "日本語",
+    "langJaKo": "日本語 + 한국어"
   },
   "common": {
     "loading": "Loading...",

@@ -25,10 +25,13 @@ export interface PerformanceRecord {
 }
 
 // Google Sheets "설정" 시트
+export type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
+
 export interface AppSettings {
   autoMode: boolean;
   postTime: string;            // "19:00" 형식
   language: 'ko' | 'en';
+  captionLanguage: CaptionLanguage;
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;
