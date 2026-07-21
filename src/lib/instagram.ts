@@ -96,14 +96,24 @@ export class InstagramService {
           },
         );
 
-        // Step 2: Poll for processing completion (max 2 minutes)
-        for (let i = 0; i < 24; i++) {
+        // Step 2: Poll for processing completion (max 3 minutes)
+        let processingDone = false;
+        for (let i = 0; i < 36; i++) {
           await new Promise(r => setTimeout(r, 5000));
-          const status = await this.request<{ status_code: string }>(
-            `${this.baseUrl}/${container.id}?fields=status_code&access_token=${this.accessToken}`
+          const status = await this.request<{ status_code: string; status?: string }>(
+            `${this.baseUrl}/${container.id}?fields=status_code,status&access_token=${this.accessToken}`
           );
-          if (status.status_code === 'FINISHED') break;
-          if (status.status_code === 'ERROR') throw new Error('Reels video processing failed');
+          console.log(`[Instagram] Reels processing poll ${i + 1}/36: status_code=${status.status_code}, status=${status.status || ''}`);
+          if (status.status_code === 'FINISHED') {
+            processingDone = true;
+            break;
+          }
+          if (status.status_code === 'ERROR') {
+            throw new Error(`Reels 처리 실패 (Instagram): ${status.status || 'unknown error'}. video_url=${videoUrl.substring(0, 80)}`);
+          }
+        }
+        if (!processingDone) {
+          throw new Error('Reels 처리 타임아웃 (3분 초과)');
         }
 
         // Step 3: Publish

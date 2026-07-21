@@ -822,9 +822,14 @@ export default function CreatePage() {
               {/* Error display */}
               {pipelineStep.status === 'error' && pipelineStep.error && step !== 'trend' && (
                 <CardContent className="border-t border-slate-800 pt-4">
-                  <div className="flex items-center gap-2 text-red-400 text-sm">
-                    <XCircle className="h-4 w-4" />
-                    <span>{pipelineStep.error}</span>
+                  <div className="rounded-lg border border-red-800/50 bg-red-950/30 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-red-400 text-sm font-medium">
+                      <XCircle className="h-4 w-4 shrink-0" />
+                      <span>{step === 'upload' ? t('step4') : step === 'image' ? t(mediaType === 'reels' ? 'step2Reels' : 'step2') : t('step3')} 실패</span>
+                    </div>
+                    <p className="text-xs text-red-300/80 font-mono whitespace-pre-wrap break-all pl-6">
+                      {pipelineStep.error}
+                    </p>
                   </div>
                 </CardContent>
               )}
