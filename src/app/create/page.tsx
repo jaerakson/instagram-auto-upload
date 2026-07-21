@@ -762,6 +762,14 @@ export default function CreatePage() {
               {/* Step 3: Caption editor (visible after image generation) */}
               {step === 'caption' && pipeline[1].status === 'complete' && pipelineStep.status !== 'complete' && (
                 <CardContent className="border-t border-slate-800 pt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="outline" className="border-purple-500/30 text-purple-400 text-xs">
+                      {t(STYLE_PRESET_OPTIONS.find(o => o.value === stylePreset)?.labelKey || 'stylePhotorealistic')}
+                    </Badge>
+                    <Badge variant="outline" className="border-slate-600 text-slate-400 text-xs">
+                      {t(mediaType === 'reels' ? 'mediaReels' : 'mediaImage')}
+                    </Badge>
+                  </div>
                   <CaptionEditor
                     caption={editCaption}
                     hashtags={editHashtags}
@@ -781,6 +789,14 @@ export default function CreatePage() {
               {/* Step 3: Caption confirmed */}
               {step === 'caption' && pipelineStep.status === 'complete' && (
                 <CardContent className="border-t border-slate-800 pt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="outline" className="border-purple-500/30 text-purple-400 text-xs">
+                      {t(STYLE_PRESET_OPTIONS.find(o => o.value === stylePreset)?.labelKey || 'stylePhotorealistic')}
+                    </Badge>
+                    <Badge variant="outline" className="border-slate-600 text-slate-400 text-xs">
+                      {t(mediaType === 'reels' ? 'mediaReels' : 'mediaImage')}
+                    </Badge>
+                  </div>
                   <div className="space-y-2 text-sm">
                     <div>
                       <label className="mb-1 block text-xs text-slate-500">{t('caption')}</label>
