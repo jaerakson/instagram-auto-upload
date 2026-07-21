@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
   Play,
   RotateCcw,
   Film,
+  Square,
 } from 'lucide-react';
 import type { CaptionLanguage, MediaType, StylePreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 import { cn } from '@/lib/utils';
@@ -78,6 +79,9 @@ export default function CreatePage() {
   const [regeneratingCaption, setRegeneratingCaption] = useState(false);
   const [regeneratingHashtags, setRegeneratingHashtags] = useState(false);
   const [autoAllRunning, setAutoAllRunning] = useState(false);
+  const [autoProgress, setAutoProgress] = useState(0); // 0~100
+  const [autoStepLabel, setAutoStepLabel] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [stylePreset, setStylePreset] = useState<StylePreset>('photorealistic');
 
@@ -92,6 +96,27 @@ export default function CreatePage() {
     setEditHashtags('');
     setTrendReport('');
     setErrorMsg('');
+    setAutoProgress(0);
+    setAutoStepLabel('');
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setAutoAllRunning(false);
+    setGeneratingPrompt(false);
+    setAutoProgress(0);
+    setAutoStepLabel('');
+    setPipeline((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < next.length; i++) {
+        if (next[i].status === 'running') {
+          next[i] = { ...next[i], status: 'idle', error: undefined };
+        }
+      }
+      return next;
+    });
+    setErrorMsg(t('cancelled'));
   }
 
   // AI auto-generate: trend analysis + prompt generation → auto-complete trend step
@@ -168,8 +193,13 @@ export default function CreatePage() {
 
   // Full pipeline: trend → image → caption → confirm caption → upload
   async function handleAutoAll() {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const signal = controller.signal;
     setAutoAllRunning(true);
     setErrorMsg('');
+    setAutoProgress(5);
+    setAutoStepLabel(t('step1'));
     try {
       // Step 1: Trend analysis + prompt generation
       setGeneratingPrompt(true);
@@ -177,6 +207,7 @@ export default function CreatePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stylePreset }),
+        signal,
       });
       const promptJson = await promptRes.json();
       if (!promptJson.success) throw new Error(promptJson.error || 'Prompt generation failed');
@@ -202,6 +233,8 @@ export default function CreatePage() {
         return next;
       });
       setGeneratingPrompt(false);
+      setAutoProgress(25);
+      setAutoStepLabel(t(mediaType === 'reels' ? 'step2Reels' : 'step2'));
 
       // Step 2: Image generation
       setPipeline((prev) => {
@@ -217,6 +250,7 @@ export default function CreatePage() {
           aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
           type: mediaType,
         }),
+        signal,
       });
       const imgJson = await imgRes.json();
       if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
@@ -235,6 +269,8 @@ export default function CreatePage() {
       });
 
       // Step 3: Caption generation
+      setAutoProgress(50);
+      setAutoStepLabel(t('step3'));
       setPipeline((prev) => {
         const next = [...prev];
         next[2] = { ...next[2], status: 'running', error: undefined };
@@ -249,6 +285,7 @@ export default function CreatePage() {
           language: captionLang,
           mode: 'full',
         }),
+        signal,
       });
       const capJson = await capRes.json();
       if (!capJson.success) throw new Error(capJson.error || 'Caption generation failed');
@@ -272,6 +309,8 @@ export default function CreatePage() {
       });
 
       // Step 4: Upload
+      setAutoProgress(75);
+      setAutoStepLabel(t('step4'));
       setPipeline((prev) => {
         const next = [...prev];
         next[3] = { ...next[3], status: 'running', error: undefined };
@@ -287,6 +326,7 @@ export default function CreatePage() {
           caption: fullText,
           mediaType,
         }),
+        signal,
       });
       const uploadJson = await uploadRes.json();
       if (!uploadJson.success) throw new Error(uploadJson.error || 'Upload failed');
@@ -312,16 +352,19 @@ export default function CreatePage() {
           trendReport: generatedTrendReport,
           style: generatedStyle || '',
         }),
+        signal,
       });
+      setAutoProgress(100);
+      setAutoStepLabel(t('complete'));
       setPipeline((prev) => {
         const next = [...prev];
         next[3] = { step: 'upload', status: 'complete', result: uploadResult };
         return next;
       });
     } catch (error) {
+      if (signal.aborted) return; // 취소된 경우 무시
       const msg = error instanceof Error ? error.message : 'Unknown error';
       setErrorMsg(msg);
-      // Mark the currently running step as error
       setPipeline((prev) => {
         const next = [...prev];
         for (let i = 0; i < next.length; i++) {
@@ -334,6 +377,7 @@ export default function CreatePage() {
     } finally {
       setGeneratingPrompt(false);
       setAutoAllRunning(false);
+      abortRef.current = null;
     }
   }
 
@@ -542,19 +586,41 @@ export default function CreatePage() {
             ))}
           </select>
         </div>
-        <Button
-          size="lg"
-          disabled={autoAllRunning || pipeline.some((s) => s.status === 'running')}
-          onClick={handleAutoAll}
-          className="flex-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white text-lg font-semibold hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 disabled:opacity-50 h-14 rounded-xl shadow-lg shadow-purple-500/20"
-        >
-          {autoAllRunning ? (
-            <><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('autoAllRunning')}</>
-          ) : (
-            <><Play className="mr-2 h-5 w-5" />{t('autoAll')}</>
-          )}
-        </Button>
+        {autoAllRunning ? (
+          <Button
+            size="lg"
+            onClick={handleCancel}
+            className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white text-lg font-semibold hover:from-red-600 hover:to-red-700 h-14 rounded-xl shadow-lg shadow-red-500/20"
+          >
+            <Square className="mr-2 h-5 w-5" />{t('cancel')}
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            disabled={pipeline.some((s) => s.status === 'running')}
+            onClick={handleAutoAll}
+            className="flex-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white text-lg font-semibold hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 disabled:opacity-50 h-14 rounded-xl shadow-lg shadow-purple-500/20"
+          >
+            <Play className="mr-2 h-5 w-5" />{t('autoAll')}
+          </Button>
+        )}
       </div>
+
+      {/* Progress Bar */}
+      {autoAllRunning && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400">{autoStepLabel}</span>
+            <span className="text-slate-500">{autoProgress}%</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 transition-all duration-700 ease-out"
+              style={{ width: `${autoProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {steps.map(({ step, icon: StepIcon }, i) => {

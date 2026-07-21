@@ -56,6 +56,8 @@
     "generatingVideo": "동영상 생성 중...",
     "autoAll": "전체 자동 생성",
     "autoAllRunning": "자동 생성 중...",
+    "cancel": "취소",
+    "cancelled": "작업이 취소되었습니다",
     "newPost": "새 게시물 만들기",
     "manualInputHint": "직접 프롬프트를 입력하거나 AI 자동 생성을 사용하세요",
     "mediaType": "형식",
