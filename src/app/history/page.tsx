@@ -123,7 +123,7 @@ export default function HistoryPage() {
                   onClick={() => setSelected(post)}
                 >
                   <TableCell className="py-2">
-                    {imgSrc?.endsWith('.mp4') ? (
+                    {imgSrc?.includes('.mp4') ? (
                       <video
                         src={imgSrc}
                         muted
@@ -201,7 +201,7 @@ export default function HistoryPage() {
               </SheetHeader>
               <div className="mt-4 space-y-5">
                 {selected.imageUrl && (
-                  selected.imageUrl.endsWith('.mp4') ? (
+                  selected.imageUrl.includes('.mp4') ? (
                     <video
                       src={selected.imageUrl}
                       controls

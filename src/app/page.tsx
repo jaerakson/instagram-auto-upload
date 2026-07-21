@@ -124,7 +124,7 @@ export default function DashboardPage() {
                 className="group overflow-hidden rounded-xl border border-slate-800 bg-slate-950 transition-colors hover:border-slate-700"
               >
                 <div className="aspect-square overflow-hidden">
-                  {post.imageUrl?.endsWith('.mp4') ? (
+                  {post.imageUrl?.includes('.mp4') ? (
                     <video
                       src={post.imageUrl}
                       muted
