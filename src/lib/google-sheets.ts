@@ -45,6 +45,7 @@ export class GoogleSheetsService {
       mediaType: row[12] || undefined,
       stylePreset: row[13] || undefined,
       captionLang: row[14] || undefined,
+      trendPreset: row[15] || undefined,
     }));
   }
 
@@ -70,6 +71,7 @@ export class GoogleSheetsService {
           post.mediaType ?? '',
           post.stylePreset ?? '',
           post.captionLang ?? '',
+          post.trendPreset ?? '',
         ]],
       },
     });
@@ -109,6 +111,7 @@ export class GoogleSheetsService {
       updates.mediaType ?? current[12] ?? '',
       updates.stylePreset ?? current[13] ?? '',
       updates.captionLang ?? current[14] ?? '',
+      updates.trendPreset ?? current[15] ?? '',
     ];
 
     await this.sheets.spreadsheets.values.update({

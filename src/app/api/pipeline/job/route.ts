@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       mediaType: body.mediaType || 'image',
       stylePreset: body.stylePreset || 'photorealistic',
       captionLang: body.captionLang || 'ko+en',
+      trendPreset: body.trendPreset || 'portrait',
     };
     await sheetsService.addPost(post);
     return NextResponse.json<ApiResponse<{ id: string }>>({ success: true, data: { id: post.id } });

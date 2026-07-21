@@ -15,6 +15,7 @@ export interface PostRecord {
   mediaType?: string;          // 'image' | 'reels'
   stylePreset?: string;        // style preset used
   captionLang?: string;        // caption language used
+  trendPreset?: string;        // trend preset used
 }
 
 // Google Sheets "성과" 시트 행
@@ -71,6 +72,19 @@ export const DEFAULT_TREND_KEYWORDS: Record<TrendPreset, string> = {
 };
 
 export const DEFAULT_TREND_PROMPT = 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
+
+export const DEFAULT_GENERATE_PROMPT = `You are an Instagram AI art prompt expert. Generate a single high-quality image generation prompt and style for trending AI art on Instagram.
+
+Rules:
+- The prompt must be in English, 30-80 words
+- Structure: [subject], [style], [mood/lighting], [background], [quality boosters]
+- Include quality boosters: highly detailed, professional, 8k resolution, cinematic lighting, sharp focus
+- Avoid: blurry, low quality, watermark, overly perfect plastic skin
+- Focus on styles that get high engagement: cinematic portraits, vintage film grain, dreamy aesthetics, editorial fashion
+- Add intentional imperfection for authenticity (film grain, light leaks, natural skin texture)
+- The style field should be 2-4 comma-separated keywords
+- For VIDEO/Reels prompts: Always end the prompt with an audio description — background music genre + ambient sounds + optional short Korean dialogue in quotes. Example: "...with soft lo-fi piano music, gentle rain sounds, she whispers '비가 참 좋다'"`;
+
 
 // 파이프라인 실행 상태
 export interface PipelineStep {

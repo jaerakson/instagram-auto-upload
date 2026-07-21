@@ -490,6 +490,7 @@ export default function CreatePage() {
     if (job.mediaType) setMediaType(job.mediaType);
     if (job.stylePreset) setStylePreset(job.stylePreset);
     if (job.captionLang) setCaptionLang(job.captionLang);
+    if (job.trendPreset) setTrendPreset(job.trendPreset);
 
     const step = job.currentStep || 0;
     setPipeline(prev => {
@@ -531,6 +532,7 @@ export default function CreatePage() {
             mediaType,
             stylePreset,
             captionLang,
+            trendPreset,
           }),
         });
       } else {
@@ -548,6 +550,7 @@ export default function CreatePage() {
             mediaType,
             stylePreset,
             captionLang,
+            trendPreset,
           }),
         });
         const json = await res.json();
