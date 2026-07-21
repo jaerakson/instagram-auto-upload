@@ -1056,10 +1056,13 @@ function ImageResultView({ result }: { result: ImageResult }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
       <div className="shrink-0 overflow-hidden rounded-xl border border-slate-700">
-        {result.mediaType === 'reels' ? (
+        {result.mediaType === 'reels' || result.imageUrl?.includes('.mp4') ? (
           <video
             src={result.imageUrl}
             controls
+            autoPlay
+            loop
+            playsInline
             className="h-64 w-auto max-w-xs object-cover"
           />
         ) : (
