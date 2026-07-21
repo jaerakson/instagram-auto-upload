@@ -92,7 +92,20 @@ export default function CreatePage() {
   const [pendingJob, setPendingJob] = useState<any>(null);
 
   useEffect(() => {
-    async function checkPendingJob() {
+    async function init() {
+      // 설정에서 기본값 로드
+      try {
+        const settingsRes = await fetch('/api/sheets/settings');
+        const settingsJson = await settingsRes.json();
+        if (settingsJson.success && settingsJson.data) {
+          const s = settingsJson.data;
+          if (s.mediaType) setMediaType(s.mediaType);
+          if (s.stylePreset) setStylePreset(s.stylePreset);
+          if (s.captionLanguage) setCaptionLang(s.captionLanguage);
+        }
+      } catch { /* ignore */ }
+
+      // 미완료 작업 체크
       try {
         const res = await fetch('/api/pipeline/job');
         const json = await res.json();
@@ -102,7 +115,7 @@ export default function CreatePage() {
         }
       } catch { /* ignore */ }
     }
-    checkPendingJob();
+    init();
   }, []);
 
   const isAllComplete = pipeline.every((s) => s.status === 'complete');

@@ -39,12 +39,27 @@ export interface AppSettings {
   language: 'ko' | 'en';
   captionLanguage: CaptionLanguage;
   trendKeywords: string;
+  trendPrompt: string;         // 트렌드 분석 프롬프트 (시트 커스텀)
   mediaType: MediaType;
   stylePreset: StylePreset;
+  stylePrompts: Record<string, string>; // 스타일별 프롬프트 (시트 커스텀)
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;
 }
+
+// 소스 코드 기본값 — 시트에 없으면 이 값 사용
+export const DEFAULT_STYLE_PROMPTS: Record<StylePreset, string> = {
+  photorealistic: 'cinematic photography, natural lighting, film grain, realistic skin texture, DSLR quality, sharp focus',
+  anime: 'anime illustration, cel shading, vibrant colors, detailed linework, anime aesthetic',
+  ghibli: 'Studio Ghibli style, watercolor, soft pastoral, whimsical atmosphere, hand-painted feel',
+  vintage_film: 'vintage 35mm film photography, light leaks, warm tones, nostalgic grain, faded colors',
+  watercolor: 'watercolor painting, soft brushstrokes, bleeding colors, paper texture, artistic',
+  '3d_render': '3D render, octane render, volumetric lighting, subsurface scattering, photorealistic CGI',
+  pop_art: 'pop art style, bold flat colors, comic aesthetic, graphic design, halftone dots',
+};
+
+export const DEFAULT_TREND_PROMPT = 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
 
 // 파이프라인 실행 상태
 export interface PipelineStep {

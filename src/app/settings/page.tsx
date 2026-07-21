@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle } from 'lucide-react';
+import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle, RotateCcw } from 'lucide-react';
 import type { AppSettings, CaptionLanguage, MediaType, StylePreset, CredentialKey, CredentialStatus } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
 
 interface KeyConfig {
   key: CredentialKey;
@@ -43,8 +44,10 @@ const defaultSettings: AppSettings = {
   language: 'ko',
   captionLanguage: 'ko+en',
   trendKeywords: '',
+  trendPrompt: DEFAULT_TREND_PROMPT,
   mediaType: 'image' as const,
   stylePreset: 'photorealistic' as const,
+  stylePrompts: { ...DEFAULT_STYLE_PROMPTS },
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -306,14 +309,21 @@ export default function SettingsPage() {
           </Card>
 
           <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5">
-              <Label className="mb-3 block text-sm text-white">
-                {t('stylePreset')}
-              </Label>
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-white">{t('stylePreset')}</Label>
+                <button
+                  onClick={() => update('stylePrompts', { ...DEFAULT_STYLE_PROMPTS })}
+                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {t('resetDefaults')}
+                </button>
+              </div>
               <select
                 value={settings.stylePreset}
                 onChange={(e) => update('stylePreset', e.target.value as StylePreset)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none w-full"
               >
                 {STYLE_PRESET_OPTIONS.map(({ value, labelKey }) => (
                   <option key={value} value={value}>
@@ -321,7 +331,19 @@ export default function SettingsPage() {
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-slate-500">{t('stylePresetDesc')}</p>
+              <div>
+                <label className="mb-1.5 block text-xs text-slate-500">{t('stylePromptLabel')}</label>
+                <textarea
+                  value={settings.stylePrompts?.[settings.stylePreset] || DEFAULT_STYLE_PROMPTS[settings.stylePreset] || ''}
+                  onChange={(e) => {
+                    const updated = { ...(settings.stylePrompts || {}), [settings.stylePreset]: e.target.value };
+                    update('stylePrompts', updated);
+                  }}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 font-mono focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              <p className="text-xs text-slate-500">{t('stylePresetDesc')}</p>
             </CardContent>
           </Card>
         </>
@@ -358,6 +380,24 @@ export default function SettingsPage() {
             rows={2}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-purple-500 focus:outline-none"
           />
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-slate-500">{t('trendPromptLabel')}</label>
+              <button
+                onClick={() => update('trendPrompt', DEFAULT_TREND_PROMPT)}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                {t('resetDefaults')}
+              </button>
+            </div>
+            <textarea
+              value={settings.trendPrompt || DEFAULT_TREND_PROMPT}
+              onChange={(e) => update('trendPrompt', e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 font-mono focus:border-purple-500 focus:outline-none"
+            />
+          </div>
         </CardContent>
       </Card>
 

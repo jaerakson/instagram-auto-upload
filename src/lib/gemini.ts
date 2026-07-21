@@ -42,7 +42,7 @@ export class GeminiService {
     return repaired;
   }
 
-  async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string): Promise<TrendResult> {
+  async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string, trendPromptOverride?: string): Promise<TrendResult> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let performanceSection = '';
@@ -63,9 +63,10 @@ Based on this data, include a "performanceFeedback" field with actionable insigh
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
 {"summary": "2-3 sentence overview of current trends", "topStyles": ["style1", "style2", "style3", "style4", "style5"], "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"], "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"], "avoidList": ["avoid1", "avoid2", "avoid3"]${performanceData && performanceData.length > 0 ? ', "performanceFeedback": "actionable feedback based on past performance data"' : ''}}`;
 
+    const defaultQuery = 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
     const searchQuery = trendKeywords
       ? `Search the web for the latest Instagram trends about: ${trendKeywords}. Then analyze what styles, aesthetics, and techniques are getting the most engagement right now.`
-      : 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
+      : (trendPromptOverride || defaultQuery);
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -100,18 +101,12 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     return parsed;
   }
 
-  async generatePrompt(trendContext?: TrendResult, stylePreset?: string): Promise<{ prompt: string; style: string; trendReport: string }> {
+  async generatePrompt(
+    trendContext?: TrendResult,
+    stylePreset?: string,
+    stylePromptOverride?: string,
+  ): Promise<{ prompt: string; style: string; trendReport: string }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
-
-    const styleDirectives: Record<string, string> = {
-      photorealistic: 'cinematic photography, natural lighting, film grain, realistic skin texture, DSLR quality, sharp focus',
-      anime: 'anime illustration, cel shading, vibrant colors, detailed linework, anime aesthetic',
-      ghibli: 'Studio Ghibli style, watercolor, soft pastoral, whimsical atmosphere, hand-painted feel',
-      vintage_film: 'vintage 35mm film photography, light leaks, warm tones, nostalgic grain, faded colors',
-      watercolor: 'watercolor painting, soft brushstrokes, bleeding colors, paper texture, artistic',
-      '3d_render': '3D render, octane render, volumetric lighting, subsurface scattering, photorealistic CGI',
-      pop_art: 'pop art style, bold flat colors, comic aesthetic, graphic design, halftone dots',
-    };
 
     let trendSection = '';
     if (trendContext) {
@@ -127,7 +122,7 @@ Use these trends to inform the prompt you generate. Lean into the top styles and
     }
 
     let styleSection = '';
-    const directive = styleDirectives[stylePreset || 'photorealistic'];
+    const directive = stylePromptOverride || '';
     if (directive) {
       styleSection = `\n\nIMPORTANT STYLE CONSTRAINT: The generated prompt MUST be in this visual style: ${directive}. Every element of the prompt should reflect this aesthetic.`;
     }

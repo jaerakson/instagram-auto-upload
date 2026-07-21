@@ -60,17 +60,21 @@ export async function POST(request: Request) {
 
       let trendKeywords = '';
       let currentStylePreset = 'photorealistic';
+      let currentTrendPrompt = '';
+      let currentStylePrompt = '';
       try {
         const settings = await sheetsService.getSettings();
         trendKeywords = settings.trendKeywords || '';
         currentMediaType = settings.mediaType || 'image';
         currentStylePreset = settings.stylePreset || 'photorealistic';
+        currentTrendPrompt = settings.trendPrompt || '';
+        currentStylePrompt = settings.stylePrompts?.[currentStylePreset] || '';
       } catch {
-        // Continue without trend keywords
+        // Continue without settings
       }
 
-      const trendResult = await geminiService.analyzeTrends(performanceData, trendKeywords);
-      const promptResult = await geminiService.generatePrompt(trendResult, currentStylePreset);
+      const trendResult = await geminiService.analyzeTrends(performanceData, trendKeywords, currentTrendPrompt);
+      const promptResult = await geminiService.generatePrompt(trendResult, currentStylePreset, currentStylePrompt);
 
       finalPrompt = promptResult.prompt;
       finalStyle = promptResult.style;

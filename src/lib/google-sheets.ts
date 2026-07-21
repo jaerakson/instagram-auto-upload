@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
-import type { PostRecord, PerformanceRecord, AppSettings } from '@/types';
+import type { PostRecord, PerformanceRecord, AppSettings, StylePreset } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
 
 const SHEET_POSTS = '게시기록';
 const SHEET_PERFORMANCE = '성과';
@@ -215,14 +216,23 @@ export class GoogleSheetsService {
 
     const toBool = (v: string | undefined) => v?.toLowerCase() === 'true';
 
+    // 스타일 프롬프트: 시트에 있으면 시트값, 없으면 소스 기본값
+    const stylePrompts: Record<string, string> = {};
+    for (const key of Object.keys(DEFAULT_STYLE_PROMPTS) as StylePreset[]) {
+      const sheetVal = settingsMap.get(`stylePrompt_${key}`);
+      stylePrompts[key] = sheetVal || DEFAULT_STYLE_PROMPTS[key];
+    }
+
     return {
       autoMode: toBool(settingsMap.get('autoMode')),
       postTime: settingsMap.get('postTime') || '19:00',
       language: (settingsMap.get('language') || 'ko') as 'ko' | 'en',
       captionLanguage: (settingsMap.get('captionLanguage') || 'en') as AppSettings['captionLanguage'],
       trendKeywords: settingsMap.get('trendKeywords') || '',
+      trendPrompt: settingsMap.get('trendPrompt') || DEFAULT_TREND_PROMPT,
       mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
       stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
+      stylePrompts,
       instagramConnected: toBool(settingsMap.get('instagramConnected')),
       googleSheetsConnected: toBool(settingsMap.get('googleSheetsConnected')),
       geminiConnected: toBool(settingsMap.get('geminiConnected')),
@@ -232,12 +242,13 @@ export class GoogleSheetsService {
   async updateSettings(settings: Partial<AppSettings>): Promise<void> {
     const current = await this.getSettings();
     const merged = { ...current, ...settings };
-    const rows = [
+    const rows: string[][] = [
       ['autoMode', String(merged.autoMode)],
       ['postTime', merged.postTime],
       ['language', merged.language],
       ['captionLanguage', merged.captionLanguage],
       ['trendKeywords', merged.trendKeywords || ''],
+      ['trendPrompt', merged.trendPrompt || DEFAULT_TREND_PROMPT],
       ['mediaType', merged.mediaType || 'image'],
       ['stylePreset', merged.stylePreset || 'photorealistic'],
       ['instagramConnected', String(merged.instagramConnected)],
@@ -245,9 +256,15 @@ export class GoogleSheetsService {
       ['geminiConnected', String(merged.geminiConnected)],
     ];
 
+    // 스타일 프롬프트 추가
+    const sp = merged.stylePrompts || {};
+    for (const key of Object.keys(DEFAULT_STYLE_PROMPTS) as StylePreset[]) {
+      rows.push([`stylePrompt_${key}`, sp[key] || DEFAULT_STYLE_PROMPTS[key]]);
+    }
+
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_SETTINGS}!A2:B11`,
+      range: `${SHEET_SETTINGS}!A2:B${rows.length + 1}`,
       valueInputOption: 'RAW',
       requestBody: { values: rows },
     });
