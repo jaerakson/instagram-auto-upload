@@ -105,6 +105,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     trendContext?: TrendResult,
     stylePreset?: string,
     stylePromptOverride?: string,
+    generatePromptOverride?: string,
   ): Promise<{ prompt: string; style: string; trendReport: string }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
@@ -127,7 +128,7 @@ Use these trends to inform the prompt you generate. Lean into the top styles and
       styleSection = `\n\nIMPORTANT STYLE CONSTRAINT: The generated prompt MUST be in this visual style: ${directive}. Every element of the prompt should reflect this aesthetic.`;
     }
 
-    const systemInstruction = `You are an Instagram AI art prompt expert. Generate a single high-quality image generation prompt and style for trending AI art on Instagram.
+    const baseInstruction = generatePromptOverride || `You are an Instagram AI art prompt expert. Generate a single high-quality image generation prompt and style for trending AI art on Instagram.
 
 Rules:
 - The prompt must be in English, 30-80 words
@@ -137,7 +138,9 @@ Rules:
 - Focus on styles that get high engagement: cinematic portraits, vintage film grain, dreamy aesthetics, editorial fashion
 - Add intentional imperfection for authenticity (film grain, light leaks, natural skin texture)
 - The style field should be 2-4 comma-separated keywords
-- For VIDEO/Reels prompts: Always end the prompt with an audio description — background music genre + ambient sounds + optional short Korean dialogue in quotes. Example: "...with soft lo-fi piano music, gentle rain sounds, she whispers '비가 참 좋다'"${trendSection}${styleSection}
+- For VIDEO/Reels prompts: Always end the prompt with an audio description — background music genre + ambient sounds + optional short Korean dialogue in quotes. Example: "...with soft lo-fi piano music, gentle rain sounds, she whispers '비가 참 좋다'"`;
+
+    const systemInstruction = `${baseInstruction}${trendSection}${styleSection}
 
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
 {"prompt": "your prompt here", "style": "keyword1, keyword2, keyword3"}`;

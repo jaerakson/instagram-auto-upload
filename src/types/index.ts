@@ -44,6 +44,7 @@ export interface AppSettings {
   trendKeywords: string;
   trendPrompt: string;         // 트렌드 분석 프롬프트 (시트 커스텀)
   trendKeywordPrompts: Record<string, string>; // 트렌드 프리셋별 키워드
+  generatePrompt: string;      // 게시물 생성 프롬프트 (시트 커스텀)
   mediaType: MediaType;
   stylePreset: StylePreset;
   stylePrompts: Record<string, string>; // 스타일별 프롬프트 (시트 커스텀)

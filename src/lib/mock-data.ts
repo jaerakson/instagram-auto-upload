@@ -122,6 +122,7 @@ export const mockSettings: AppSettings = {
   trendKeywords: '',
   trendPrompt: '',
   trendKeywordPrompts: {},
+  generatePrompt: '',
   mediaType: 'image' as const,
   stylePreset: 'photorealistic' as const,
   stylePrompts: {},

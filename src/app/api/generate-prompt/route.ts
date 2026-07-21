@@ -9,11 +9,13 @@ export async function POST(request: Request) {
     let stylePreset = 'photorealistic';
     let stylePromptOverride = '';
     let trendPromptOverride = '';
+    let generatePromptOverride = '';
     try {
       const body = await request.json();
       if (body.stylePreset) stylePreset = body.stylePreset;
       if (body.stylePrompt) stylePromptOverride = body.stylePrompt;
       if (body.trendPrompt) trendPromptOverride = body.trendPrompt;
+      if (body.generatePrompt) generatePromptOverride = body.generatePrompt;
     } catch {
       // No body or invalid JSON — use default
     }
@@ -38,6 +40,9 @@ export async function POST(request: Request) {
       if (!trendPromptOverride) {
         trendPromptOverride = settings.trendPrompt || DEFAULT_TREND_PROMPT;
       }
+      if (!generatePromptOverride) {
+        generatePromptOverride = settings.generatePrompt || '';
+      }
     } catch {
       if (!stylePromptOverride) {
         stylePromptOverride = DEFAULT_STYLE_PROMPTS[stylePreset as keyof typeof DEFAULT_STYLE_PROMPTS] || '';
@@ -45,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const trendResult: TrendResult = await geminiService.analyzeTrends(performanceData, trendKeywords, trendPromptOverride);
-    const result = await geminiService.generatePrompt(trendResult, stylePreset, stylePromptOverride);
+    const result = await geminiService.generatePrompt(trendResult, stylePreset, stylePromptOverride, generatePromptOverride);
 
     return NextResponse.json<ApiResponse<{ prompt: string; style: string; trendReport: string }>>({
       success: true,

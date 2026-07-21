@@ -171,6 +171,8 @@
     "stylePresetDesc": "Choose the visual style for AI-generated images",
     "stylePromptLabel": "Style Prompt",
     "trendPromptLabel": "Trend Analysis Prompt",
+    "generatePromptLabel": "Generation Prompt",
+    "generatePromptDesc": "System instructions used when AI generates image prompts",
     "resetDefaults": "Reset",
     "stylePhotorealistic": "Photorealistic",
     "styleAnime": "Anime",

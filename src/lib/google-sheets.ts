@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import type { PostRecord, PerformanceRecord, AppSettings, StylePreset, TrendPreset } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT } from '@/types';
 
 const SHEET_POSTS = '게시기록';
 const SHEET_PERFORMANCE = '성과';
@@ -242,6 +242,7 @@ export class GoogleSheetsService {
       trendKeywords: settingsMap.get('trendKeywords') || '',
       trendPrompt: settingsMap.get('trendPrompt') || DEFAULT_TREND_PROMPT,
       trendKeywordPrompts,
+      generatePrompt: settingsMap.get('generatePrompt') || DEFAULT_GENERATE_PROMPT,
       mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
       stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
       stylePrompts,
@@ -262,6 +263,7 @@ export class GoogleSheetsService {
       ['trendPreset', merged.trendPreset || 'portrait'],
       ['trendKeywords', merged.trendKeywords || ''],
       ['trendPrompt', merged.trendPrompt || DEFAULT_TREND_PROMPT],
+      ['generatePrompt', merged.generatePrompt || DEFAULT_GENERATE_PROMPT],
       ['mediaType', merged.mediaType || 'image'],
       ['stylePreset', merged.stylePreset || 'photorealistic'],
       ['instagramConnected', String(merged.instagramConnected)],

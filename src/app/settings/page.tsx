@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle, RotateCcw } from 'lucide-react';
 import type { AppSettings, CaptionLanguage, MediaType, StylePreset, TrendPreset, CredentialKey, CredentialStatus } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT } from '@/types';
 
 const TREND_PRESET_OPTIONS: { value: TrendPreset; labelKey: string }[] = [
   { value: 'portrait', labelKey: 'trendPortrait' },
@@ -55,6 +55,7 @@ const defaultSettings: AppSettings = {
   trendKeywords: '',
   trendPrompt: DEFAULT_TREND_PROMPT,
   trendKeywordPrompts: { ...DEFAULT_TREND_KEYWORDS },
+  generatePrompt: DEFAULT_GENERATE_PROMPT,
   mediaType: 'image' as const,
   stylePreset: 'photorealistic' as const,
   stylePrompts: { ...DEFAULT_STYLE_PROMPTS },
@@ -354,6 +355,28 @@ export default function SettingsPage() {
                 />
               </div>
               <p className="text-xs text-slate-500">{t('stylePresetDesc')}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-white">{t('generatePromptLabel')}</Label>
+                <button
+                  onClick={() => update('generatePrompt', DEFAULT_GENERATE_PROMPT)}
+                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {t('resetDefaults')}
+                </button>
+              </div>
+              <textarea
+                value={settings.generatePrompt || DEFAULT_GENERATE_PROMPT}
+                onChange={(e) => update('generatePrompt', e.target.value)}
+                rows={6}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 font-mono focus:border-purple-500 focus:outline-none"
+              />
+              <p className="text-xs text-slate-500">{t('generatePromptDesc')}</p>
             </CardContent>
           </Card>
         </>
