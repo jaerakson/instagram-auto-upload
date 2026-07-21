@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       // Step 4: Upload to Instagram
       steps[3] = { step: 'upload', status: 'running' };
       const instagramService = await getInstagramService();
-      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n${finalHashtags}`.trim();
+      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n[style] ${currentStylePreset}\n\n${finalHashtags}`.trim();
       let uploadResult;
       if (currentMediaType === 'reels') {
         uploadResult = await instagramService.uploadReels(mediaUrl, fullText);
@@ -233,7 +233,7 @@ export async function POST(request: Request) {
       // Step 4: Upload
       steps[3] = { step: 'upload', status: 'running' };
       const instagramService = await getInstagramService();
-      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n${finalHashtags}`.trim();
+      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n[style] ${manualStylePreset || 'photorealistic'}\n\n${finalHashtags}`.trim();
       let uploadResult;
       if (currentMediaType === 'reels') {
         uploadResult = await instagramService.uploadReels(mediaUrl, fullText);

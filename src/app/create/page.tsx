@@ -316,7 +316,8 @@ export default function CreatePage() {
         next[3] = { ...next[3], status: 'running', error: undefined };
         return next;
       });
-      const fullText = `${generatedCaption}\n\n[image prompt]\n${generatedPrompt.trim()}\n\n${generatedHashtags}`.trim();
+      const styleLabel = STYLE_PRESET_OPTIONS.find(o => o.value === stylePreset)?.value || 'photorealistic';
+      const fullText = `${generatedCaption}\n\n[image prompt]\n${generatedPrompt.trim()}\n\n[style] ${styleLabel}\n\n${generatedHashtags}`.trim();
       const uploadRes = await fetch('/api/instagram/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -466,7 +467,8 @@ export default function CreatePage() {
         }
         case 'upload': {
           const imageStep = pipeline[1].result as ImageResult;
-          const fullText = `${editCaption}\n\n[image prompt]\n${prompt.trim()}\n\n${editHashtags}`.trim();
+          const styleLabel = STYLE_PRESET_OPTIONS.find(o => o.value === stylePreset)?.value || 'photorealistic';
+          const fullText = `${editCaption}\n\n[image prompt]\n${prompt.trim()}\n\n[style] ${styleLabel}\n\n${editHashtags}`.trim();
           const res = await fetch('/api/instagram/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
