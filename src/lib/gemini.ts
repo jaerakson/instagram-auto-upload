@@ -255,7 +255,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
         instances: [{ prompt }],
         parameters: {
           aspectRatio: options?.aspectRatio || '9:16',
-          numberOfVideos: 1,
+          sampleCount: 1,
         },
       }),
     });
