@@ -141,7 +141,8 @@ Rules:
 - Avoid: blurry, low quality, watermark, overly perfect plastic skin
 - Focus on styles that get high engagement: cinematic portraits, vintage film grain, dreamy aesthetics, editorial fashion
 - Add intentional imperfection for authenticity (film grain, light leaks, natural skin texture)
-- The style field should be 2-4 comma-separated keywords${trendSection}${styleSection}
+- The style field should be 2-4 comma-separated keywords
+- For VIDEO/Reels prompts: Always end the prompt with an audio description — background music genre + ambient sounds + optional short Korean dialogue in quotes. Example: "...with soft lo-fi piano music, gentle rain sounds, she whispers '비가 참 좋다'"${trendSection}${styleSection}
 
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
 {"prompt": "your prompt here", "style": "keyword1, keyword2, keyword3"}`;
