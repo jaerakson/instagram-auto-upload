@@ -113,7 +113,7 @@ export default function HistoryPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {posts.map((post) => {
+            {[...posts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((post) => {
               const perf = getPerf(post.mediaId);
               const imgSrc = post.imageUrl || undefined;
               return (
