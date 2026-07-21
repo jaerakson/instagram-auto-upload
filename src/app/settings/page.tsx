@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff } from 'lucide-react';
-import type { AppSettings, CaptionLanguage, CredentialKey, CredentialStatus } from '@/types';
+import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle } from 'lucide-react';
+import type { AppSettings, CaptionLanguage, MediaType, StylePreset, CredentialKey, CredentialStatus } from '@/types';
 
 interface KeyConfig {
   key: CredentialKey;
@@ -27,11 +27,24 @@ const CAPTION_LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] =
   { value: 'ja+ko', labelKey: 'langJaKo' },
 ];
 
+const STYLE_PRESET_OPTIONS: { value: StylePreset; labelKey: string }[] = [
+  { value: 'photorealistic', labelKey: 'stylePhotorealistic' },
+  { value: 'anime', labelKey: 'styleAnime' },
+  { value: 'ghibli', labelKey: 'styleGhibli' },
+  { value: 'vintage_film', labelKey: 'styleVintageFilm' },
+  { value: 'watercolor', labelKey: 'styleWatercolor' },
+  { value: '3d_render', labelKey: 'style3dRender' },
+  { value: 'pop_art', labelKey: 'stylePopArt' },
+];
+
 const defaultSettings: AppSettings = {
   autoMode: false,
   postTime: '19:00',
   language: 'ko',
-  captionLanguage: 'en',
+  captionLanguage: 'ko+en',
+  trendKeywords: '',
+  mediaType: 'image' as const,
+  stylePreset: 'photorealistic' as const,
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -43,6 +56,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>({ ...defaultSettings, language: currentLocale });
   const [saved, setSaved] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+  const [showExamples, setShowExamples] = useState(false);
 
   const [credentials, setCredentials] = useState<CredentialStatus[]>([]);
   const [inputValues, setInputValues] = useState<Record<CredentialKey, string>>({
@@ -265,8 +279,87 @@ export default function SettingsPage() {
               </select>
             </CardContent>
           </Card>
+
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5">
+              <Label className="mb-3 block text-sm text-white">
+                {t('mediaType')}
+              </Label>
+              <div className="flex gap-1 rounded-lg bg-slate-800 p-0.5 w-fit">
+                {(['image', 'reels'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => update('mediaType', type)}
+                    className={cn(
+                      'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                      settings.mediaType === type
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    )}
+                  >
+                    {t(type === 'image' ? 'mediaImage' : 'mediaReels')}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{t('mediaTypeDesc')}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5">
+              <Label className="mb-3 block text-sm text-white">
+                {t('stylePreset')}
+              </Label>
+              <select
+                value={settings.stylePreset}
+                onChange={(e) => update('stylePreset', e.target.value as StylePreset)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+              >
+                {STYLE_PRESET_OPTIONS.map(({ value, labelKey }) => (
+                  <option key={value} value={value}>
+                    {t(labelKey)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-slate-500">{t('stylePresetDesc')}</p>
+            </CardContent>
+          </Card>
         </>
       )}
+
+      {/* Trend Keywords — always visible */}
+      <Card className="border-slate-800 bg-slate-900">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Label htmlFor="trendKeywords" className="text-sm text-white">
+              {t('trendKeywords')}
+            </Label>
+            <button
+              type="button"
+              onClick={() => setShowExamples((prev) => !prev)}
+              className="text-slate-400 hover:text-purple-400 transition-colors"
+              title={t('trendKeywords')}
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">{t('trendKeywordsDesc')}</p>
+          {showExamples && (
+            <div className="mb-3 rounded-lg border border-slate-700/50 bg-slate-950 p-3 text-xs text-slate-400 whitespace-pre-line">
+              {t('trendKeywordsExamples')}
+              <p className="mt-2 text-slate-500">{t('trendKeywordsExamplesNote')}</p>
+            </div>
+          )}
+          <textarea
+            id="trendKeywords"
+            value={settings.trendKeywords}
+            onChange={(e) => update('trendKeywords', e.target.value)}
+            placeholder={t('trendKeywordsPlaceholder')}
+            rows={2}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-purple-500 focus:outline-none"
+          />
+        </CardContent>
+      </Card>
 
       {/* API Keys */}
       <Card className="border-slate-800 bg-slate-900">

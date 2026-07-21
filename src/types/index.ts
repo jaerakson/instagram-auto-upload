@@ -26,12 +26,17 @@ export interface PerformanceRecord {
 
 // Google Sheets "설정" 시트
 export type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
+export type MediaType = 'image' | 'reels';
+export type StylePreset = 'photorealistic' | 'anime' | 'ghibli' | 'vintage_film' | 'watercolor' | '3d_render' | 'pop_art';
 
 export interface AppSettings {
   autoMode: boolean;
   postTime: string;            // "19:00" 형식
   language: 'ko' | 'en';
   captionLanguage: CaptionLanguage;
+  trendKeywords: string;
+  mediaType: MediaType;
+  stylePreset: StylePreset;
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;
@@ -60,6 +65,7 @@ export interface ImageResult {
   designIntent: string;
   model: string;
   imageSize: string;
+  mediaType?: 'image' | 'reels';
 }
 
 export interface CaptionResult {

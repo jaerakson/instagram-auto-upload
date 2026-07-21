@@ -74,6 +74,74 @@ export class InstagramService {
     throw new Error(`Upload failed after ${maxRetries} attempts: ${lastError?.message}`);
   }
 
+  async uploadReels(videoUrl: string, caption: string, maxRetries = 3): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Step 1: Create REELS container
+        const container = await this.request<{ id: string }>(
+          `${this.baseUrl}/${this.userId}/media`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              media_type: 'REELS',
+              video_url: videoUrl,
+              caption,
+              access_token: this.accessToken,
+            }),
+          },
+        );
+
+        // Step 2: Poll for processing completion (max 2 minutes)
+        for (let i = 0; i < 24; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          const status = await this.request<{ status_code: string }>(
+            `${this.baseUrl}/${container.id}?fields=status_code&access_token=${this.accessToken}`
+          );
+          if (status.status_code === 'FINISHED') break;
+          if (status.status_code === 'ERROR') throw new Error('Reels video processing failed');
+        }
+
+        // Step 3: Publish
+        const published = await this.request<{ id: string }>(
+          `${this.baseUrl}/${this.userId}/media_publish`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creation_id: container.id,
+              access_token: this.accessToken,
+            }),
+          },
+        );
+
+        // Step 4: Fetch permalink and media_url
+        let mediaUrl = '';
+        let instagramImageUrl = '';
+        try {
+          const mediaInfo = await this.request<{ permalink?: string; media_url?: string }>(
+            `${this.baseUrl}/${published.id}?fields=permalink,media_url&access_token=${this.accessToken}`,
+          );
+          mediaUrl = mediaInfo.permalink || '';
+          instagramImageUrl = mediaInfo.media_url || '';
+        } catch {
+          // Non-critical
+        }
+
+        return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+        }
+      }
+    }
+
+    throw new Error(`Reels upload failed after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
   async getMediaUrl(mediaId: string): Promise<string> {
     const res = await this.request<{ media_url?: string }>(
       `${this.baseUrl}/${mediaId}?fields=media_url&access_token=${this.accessToken}`,

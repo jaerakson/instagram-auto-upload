@@ -44,6 +44,8 @@ export async function POST(request: Request) {
     let finalCaption: string;
     let finalHashtags: string;
 
+    let currentMediaType: 'image' | 'reels' = 'image';
+
     if (isAuto) {
       // === AUTO MODE: Full AI pipeline ===
 
@@ -56,8 +58,19 @@ export async function POST(request: Request) {
         // Continue without performance data
       }
 
-      const trendResult = await geminiService.analyzeTrends(performanceData);
-      const promptResult = await geminiService.generatePrompt(trendResult);
+      let trendKeywords = '';
+      let currentStylePreset = 'photorealistic';
+      try {
+        const settings = await sheetsService.getSettings();
+        trendKeywords = settings.trendKeywords || '';
+        currentMediaType = settings.mediaType || 'image';
+        currentStylePreset = settings.stylePreset || 'photorealistic';
+      } catch {
+        // Continue without trend keywords
+      }
+
+      const trendResult = await geminiService.analyzeTrends(performanceData, trendKeywords);
+      const promptResult = await geminiService.generatePrompt(trendResult, currentStylePreset);
 
       finalPrompt = promptResult.prompt;
       finalStyle = promptResult.style;
@@ -69,20 +82,26 @@ export async function POST(request: Request) {
         result: trendResult,
       };
 
-      // Step 2: Image generation
+      // Step 2: Image/Video generation
       steps[1] = { step: 'image', status: 'running' };
-      const imageResult = await geminiService.generateImage(finalPrompt, {
-        aspectRatio: '1:1',
-      });
+      let mediaUrl: string;
+      if (currentMediaType === 'reels') {
+        const videoResult = await geminiService.generateVideo(finalPrompt, { aspectRatio: '9:16' });
+        mediaUrl = videoResult.videoUrl;
+      } else {
+        const imageResult = await geminiService.generateImage(finalPrompt, { aspectRatio: '1:1' });
+        mediaUrl = imageResult.imageUrl;
+      }
       steps[1] = {
         step: 'image',
         status: 'complete',
         result: {
-          imageUrl: imageResult.imageUrl,
+          imageUrl: mediaUrl,
           prompt: finalPrompt,
           designIntent: finalStyle,
-          model: 'imagen-4.0-generate-001',
-          imageSize: '1:1',
+          model: currentMediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+          imageSize: currentMediaType === 'reels' ? '9:16' : '1:1',
+          mediaType: currentMediaType,
         },
       };
 
@@ -111,8 +130,13 @@ export async function POST(request: Request) {
       // Step 4: Upload to Instagram
       steps[3] = { step: 'upload', status: 'running' };
       const instagramService = await getInstagramService();
-      const fullText = `${finalCaption}\n\n${finalHashtags}`.trim();
-      const uploadResult = await instagramService.uploadPhoto(imageResult.imageUrl, fullText);
+      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n${finalHashtags}`.trim();
+      let uploadResult;
+      if (currentMediaType === 'reels') {
+        uploadResult = await instagramService.uploadReels(mediaUrl, fullText);
+      } else {
+        uploadResult = await instagramService.uploadPhoto(mediaUrl, fullText);
+      }
       steps[3] = {
         step: 'upload',
         status: 'complete',
@@ -131,7 +155,7 @@ export async function POST(request: Request) {
         prompt: finalPrompt,
         caption: finalCaption,
         hashtags: finalHashtags,
-        imageUrl: uploadResult.imageUrl || imageResult.imageUrl,
+        imageUrl: uploadResult.imageUrl || mediaUrl,
         mediaId: uploadResult.mediaId,
         mediaUrl: uploadResult.mediaUrl,
         status: 'published',
@@ -143,7 +167,8 @@ export async function POST(request: Request) {
       }
     } else {
       // === MANUAL MODE: Use provided values ===
-      const { prompt, caption, hashtags, style, trendReport } = body;
+      const { prompt, caption, hashtags, style, trendReport, mediaType: manualMediaType, stylePreset: manualStylePreset } = body;
+      currentMediaType = manualMediaType || 'image';
       if (!prompt) {
         return NextResponse.json<ApiResponse>(
           { success: false, error: 'prompt는 필수입니다.' },
@@ -170,20 +195,26 @@ export async function POST(request: Request) {
         },
       };
 
-      // Step 2: Image generation
+      // Step 2: Image/Video generation
       steps[1] = { step: 'image', status: 'running' };
-      const imageResult = await geminiService.generateImage(finalPrompt, {
-        aspectRatio: '1:1',
-      });
+      let mediaUrl: string;
+      if (currentMediaType === 'reels') {
+        const videoResult = await geminiService.generateVideo(finalPrompt, { aspectRatio: '9:16' });
+        mediaUrl = videoResult.videoUrl;
+      } else {
+        const imageResult = await geminiService.generateImage(finalPrompt, { aspectRatio: '1:1' });
+        mediaUrl = imageResult.imageUrl;
+      }
       steps[1] = {
         step: 'image',
         status: 'complete',
         result: {
-          imageUrl: imageResult.imageUrl,
+          imageUrl: mediaUrl,
           prompt: finalPrompt,
           designIntent: finalStyle,
-          model: 'imagen-4.0-generate-001',
-          imageSize: '1:1',
+          model: currentMediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+          imageSize: currentMediaType === 'reels' ? '9:16' : '1:1',
+          mediaType: currentMediaType,
         },
       };
 
@@ -202,8 +233,13 @@ export async function POST(request: Request) {
       // Step 4: Upload
       steps[3] = { step: 'upload', status: 'running' };
       const instagramService = await getInstagramService();
-      const fullText = `${finalCaption}\n\n${finalHashtags}`.trim();
-      const uploadResult = await instagramService.uploadPhoto(imageResult.imageUrl, fullText);
+      const fullText = `${finalCaption}\n\n[image prompt]\n${finalPrompt}\n\n${finalHashtags}`.trim();
+      let uploadResult;
+      if (currentMediaType === 'reels') {
+        uploadResult = await instagramService.uploadReels(mediaUrl, fullText);
+      } else {
+        uploadResult = await instagramService.uploadPhoto(mediaUrl, fullText);
+      }
       steps[3] = {
         step: 'upload',
         status: 'complete',
@@ -222,7 +258,7 @@ export async function POST(request: Request) {
         prompt: finalPrompt,
         caption: finalCaption,
         hashtags: finalHashtags,
-        imageUrl: uploadResult.imageUrl || imageResult.imageUrl,
+        imageUrl: uploadResult.imageUrl || mediaUrl,
         mediaId: uploadResult.mediaId,
         mediaUrl: uploadResult.mediaUrl,
         status: 'published',

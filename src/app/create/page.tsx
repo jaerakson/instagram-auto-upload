@@ -19,8 +19,10 @@ import {
   RefreshCw,
   Play,
   RotateCcw,
+  Film,
 } from 'lucide-react';
-import type { CaptionLanguage, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import type { CaptionLanguage, MediaType, StylePreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import { cn } from '@/lib/utils';
 
 const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
   { value: 'ko', labelKey: 'langKo' },
@@ -28,6 +30,16 @@ const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
   { value: 'ko+en', labelKey: 'langKoEn' },
   { value: 'ja', labelKey: 'langJa' },
   { value: 'ja+ko', labelKey: 'langJaKo' },
+];
+
+const STYLE_PRESET_OPTIONS: { value: StylePreset; labelKey: string }[] = [
+  { value: 'photorealistic', labelKey: 'stylePhotorealistic' },
+  { value: 'anime', labelKey: 'styleAnime' },
+  { value: 'ghibli', labelKey: 'styleGhibli' },
+  { value: 'vintage_film', labelKey: 'styleVintageFilm' },
+  { value: 'watercolor', labelKey: 'styleWatercolor' },
+  { value: '3d_render', labelKey: 'style3dRender' },
+  { value: 'pop_art', labelKey: 'stylePopArt' },
 ];
 
 const steps = [
@@ -61,11 +73,13 @@ export default function CreatePage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [trendReport, setTrendReport] = useState('');
-  const [captionLang, setCaptionLang] = useState<CaptionLanguage>('en');
+  const [captionLang, setCaptionLang] = useState<CaptionLanguage>('ko+en');
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [regeneratingCaption, setRegeneratingCaption] = useState(false);
   const [regeneratingHashtags, setRegeneratingHashtags] = useState(false);
   const [autoAllRunning, setAutoAllRunning] = useState(false);
+  const [mediaType, setMediaType] = useState<MediaType>('image');
+  const [stylePreset, setStylePreset] = useState<StylePreset>('photorealistic');
 
   const isAllComplete = pipeline.every((s) => s.status === 'complete');
   const isUploadComplete = pipeline[3].status === 'complete';
@@ -85,7 +99,11 @@ export default function CreatePage() {
     setGeneratingPrompt(true);
     setErrorMsg('');
     try {
-      const res = await fetch('/api/generate-prompt', { method: 'POST' });
+      const res = await fetch('/api/generate-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stylePreset }),
+      });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Prompt generation failed');
       setPrompt(json.data.prompt);
@@ -155,7 +173,11 @@ export default function CreatePage() {
     try {
       // Step 1: Trend analysis + prompt generation
       setGeneratingPrompt(true);
-      const promptRes = await fetch('/api/generate-prompt', { method: 'POST' });
+      const promptRes = await fetch('/api/generate-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stylePreset }),
+      });
       const promptJson = await promptRes.json();
       if (!promptJson.success) throw new Error(promptJson.error || 'Prompt generation failed');
 
@@ -190,16 +212,21 @@ export default function CreatePage() {
       const imgRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: generatedPrompt.trim(), aspectRatio: '1:1' }),
+        body: JSON.stringify({
+          prompt: generatedPrompt.trim(),
+          aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
+          type: mediaType,
+        }),
       });
       const imgJson = await imgRes.json();
       if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
       const imageResult: ImageResult = {
-        imageUrl: imgJson.data.imageUrl,
+        imageUrl: imgJson.data.imageUrl || imgJson.data.videoUrl || '',
         prompt: generatedPrompt.trim(),
         designIntent: generatedStyle || '',
-        model: 'imagen-4.0-generate-001',
-        imageSize: '1:1',
+        model: mediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+        imageSize: mediaType === 'reels' ? '9:16' : '1:1',
+        mediaType,
       };
       setPipeline((prev) => {
         const next = [...prev];
@@ -250,11 +277,16 @@ export default function CreatePage() {
         next[3] = { ...next[3], status: 'running', error: undefined };
         return next;
       });
-      const fullText = `${generatedCaption}\n\n${generatedHashtags}`.trim();
+      const fullText = `${generatedCaption}\n\n[image prompt]\n${generatedPrompt.trim()}\n\n${generatedHashtags}`.trim();
       const uploadRes = await fetch('/api/instagram/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: imageResult.imageUrl, caption: fullText }),
+        body: JSON.stringify({
+          imageUrl: mediaType === 'image' ? imageResult.imageUrl : undefined,
+          videoUrl: mediaType === 'reels' ? imageResult.imageUrl : undefined,
+          caption: fullText,
+          mediaType,
+        }),
       });
       const uploadJson = await uploadRes.json();
       if (!uploadJson.success) throw new Error(uploadJson.error || 'Upload failed');
@@ -351,16 +383,21 @@ export default function CreatePage() {
           const res = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt.trim(), aspectRatio: '1:1' }),
+            body: JSON.stringify({
+              prompt: prompt.trim(),
+              aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
+              type: mediaType,
+            }),
           });
           const json = await res.json();
           if (!json.success) throw new Error(json.error || 'Image generation failed');
           const imageResult: ImageResult = {
-            imageUrl: json.data.imageUrl,
+            imageUrl: json.data.imageUrl || json.data.videoUrl || '',
             prompt: prompt.trim(),
             designIntent: style || '',
-            model: 'imagen-4.0-generate-001',
-            imageSize: '1:1',
+            model: mediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+            imageSize: mediaType === 'reels' ? '9:16' : '1:1',
+            mediaType,
           };
           setPipeline((prev) => {
             const next = [...prev];
@@ -385,11 +422,16 @@ export default function CreatePage() {
         }
         case 'upload': {
           const imageStep = pipeline[1].result as ImageResult;
-          const fullText = `${editCaption}\n\n${editHashtags}`.trim();
+          const fullText = `${editCaption}\n\n[image prompt]\n${prompt.trim()}\n\n${editHashtags}`.trim();
           const res = await fetch('/api/instagram/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: imageStep.imageUrl, caption: fullText }),
+            body: JSON.stringify({
+              imageUrl: mediaType === 'image' ? imageStep.imageUrl : undefined,
+              videoUrl: mediaType === 'reels' ? imageStep.imageUrl : undefined,
+              caption: fullText,
+              mediaType,
+            }),
           });
           const json = await res.json();
           if (!json.success) throw new Error(json.error || 'Upload failed');
@@ -457,6 +499,45 @@ export default function CreatePage() {
             className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
           >
             {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('mediaType')}</label>
+          <div className="flex gap-0.5 rounded-md bg-slate-800 p-0.5">
+            <button
+              onClick={() => setMediaType('image')}
+              className={cn(
+                'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
+                mediaType === 'image'
+                  ? 'bg-purple-500 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              )}
+            >
+              {t('mediaImage')}
+            </button>
+            <button
+              onClick={() => setMediaType('reels')}
+              className={cn(
+                'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
+                mediaType === 'reels'
+                  ? 'bg-purple-500 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              )}
+            >
+              {t('mediaReels')}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('stylePreset')}</label>
+          <select
+            value={stylePreset}
+            onChange={(e) => setStylePreset(e.target.value as StylePreset)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {STYLE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
             ))}
           </select>
@@ -702,13 +783,21 @@ function ImageResultView({ result }: { result: ImageResult }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
       <div className="shrink-0 overflow-hidden rounded-xl border border-slate-700">
-        <img
-          src={result.imageUrl}
-          alt="Generated"
-          className="h-64 w-64 object-cover"
-          width={256}
-          height={256}
-        />
+        {result.mediaType === 'reels' ? (
+          <video
+            src={result.imageUrl}
+            controls
+            className="h-64 w-auto max-w-xs object-cover"
+          />
+        ) : (
+          <img
+            src={result.imageUrl}
+            alt="Generated"
+            className="h-64 w-64 object-cover"
+            width={256}
+            height={256}
+          />
+        )}
       </div>
       <div className="space-y-2 text-sm">
         <div>

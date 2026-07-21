@@ -4,7 +4,7 @@ import type { ApiResponse } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const { prompt, aspectRatio } = await request.json();
+    const { prompt, aspectRatio, type } = await request.json();
     if (!prompt) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'prompt는 필수입니다.' },
@@ -12,10 +12,22 @@ export async function POST(request: Request) {
       );
     }
     const geminiService = await getGeminiService();
-    const result = await geminiService.generateImage(prompt, {
-      aspectRatio: aspectRatio || '1:1',
-    });
-    return NextResponse.json<ApiResponse<{ imageUrl: string }>>({ success: true, data: result });
+
+    if (type === 'reels') {
+      const result = await geminiService.generateVideo(prompt, { aspectRatio: aspectRatio || '9:16' });
+      return NextResponse.json<ApiResponse<{ videoUrl: string; type: string }>>({
+        success: true,
+        data: { videoUrl: result.videoUrl, type: 'reels' },
+      });
+    } else {
+      const result = await geminiService.generateImage(prompt, {
+        aspectRatio: aspectRatio || '1:1',
+      });
+      return NextResponse.json<ApiResponse<{ imageUrl: string; type: string }>>({
+        success: true,
+        data: { ...result, type: 'image' },
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json<ApiResponse>({ success: false, error: message }, { status: 500 });

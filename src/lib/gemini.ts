@@ -42,7 +42,7 @@ export class GeminiService {
     return repaired;
   }
 
-  async analyzeTrends(performanceData?: PerformanceRecord[]): Promise<TrendResult> {
+  async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string): Promise<TrendResult> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let performanceSection = '';
@@ -63,12 +63,17 @@ Based on this data, include a "performanceFeedback" field with actionable insigh
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
 {"summary": "2-3 sentence overview of current trends", "topStyles": ["style1", "style2", "style3", "style4", "style5"], "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"], "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"], "avoidList": ["avoid1", "avoid2", "avoid3"]${performanceData && performanceData.length > 0 ? ', "performanceFeedback": "actionable feedback based on past performance data"' : ''}}`;
 
+    const searchQuery = trendKeywords
+      ? `Search the web for the latest Instagram trends about: ${trendKeywords}. Then analyze what styles, aesthetics, and techniques are getting the most engagement right now.`
+      : 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
-        contents: [{ parts: [{ text: 'Analyze the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?' }] }],
+        contents: [{ parts: [{ text: searchQuery }] }],
+        tools: [{ google_search: {} }],
         generationConfig: {
           temperature: 0.8,
           maxOutputTokens: 2048,
@@ -95,8 +100,18 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     return parsed;
   }
 
-  async generatePrompt(trendContext?: TrendResult): Promise<{ prompt: string; style: string; trendReport: string }> {
+  async generatePrompt(trendContext?: TrendResult, stylePreset?: string): Promise<{ prompt: string; style: string; trendReport: string }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
+
+    const styleDirectives: Record<string, string> = {
+      photorealistic: 'cinematic photography, natural lighting, film grain, realistic skin texture, DSLR quality, sharp focus',
+      anime: 'anime illustration, cel shading, vibrant colors, detailed linework, anime aesthetic',
+      ghibli: 'Studio Ghibli style, watercolor, soft pastoral, whimsical atmosphere, hand-painted feel',
+      vintage_film: 'vintage 35mm film photography, light leaks, warm tones, nostalgic grain, faded colors',
+      watercolor: 'watercolor painting, soft brushstrokes, bleeding colors, paper texture, artistic',
+      '3d_render': '3D render, octane render, volumetric lighting, subsurface scattering, photorealistic CGI',
+      pop_art: 'pop art style, bold flat colors, comic aesthetic, graphic design, halftone dots',
+    };
 
     let trendSection = '';
     if (trendContext) {
@@ -111,6 +126,12 @@ Current trending context to incorporate:
 Use these trends to inform the prompt you generate. Lean into the top styles and keywords while avoiding the listed pitfalls.`;
     }
 
+    let styleSection = '';
+    const directive = styleDirectives[stylePreset || 'photorealistic'];
+    if (directive) {
+      styleSection = `\n\nIMPORTANT STYLE CONSTRAINT: The generated prompt MUST be in this visual style: ${directive}. Every element of the prompt should reflect this aesthetic.`;
+    }
+
     const systemInstruction = `You are an Instagram AI art prompt expert. Generate a single high-quality image generation prompt and style for trending AI art on Instagram.
 
 Rules:
@@ -120,7 +141,7 @@ Rules:
 - Avoid: blurry, low quality, watermark, overly perfect plastic skin
 - Focus on styles that get high engagement: cinematic portraits, vintage film grain, dreamy aesthetics, editorial fashion
 - Add intentional imperfection for authenticity (film grain, light leaks, natural skin texture)
-- The style field should be 2-4 comma-separated keywords${trendSection}
+- The style field should be 2-4 comma-separated keywords${trendSection}${styleSection}
 
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
 {"prompt": "your prompt here", "style": "keyword1, keyword2, keyword3"}`;
@@ -215,6 +236,73 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     return { imageUrl: url };
   }
 
+  async generateVideo(
+    prompt: string,
+    options?: { aspectRatio?: string },
+  ): Promise<{ videoUrl: string }> {
+    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos';
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.apiKey,
+      },
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: {
+          aspectRatio: options?.aspectRatio || '9:16',
+          durationSeconds: 8,
+          sampleCount: 1,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      throw new Error(error.error?.message || `Gemini Veo API error: ${res.status}`);
+    }
+
+    const operation = await res.json();
+    const operationName = operation.name;
+
+    // Poll for completion (max 5 minutes, 10s intervals)
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 10000));
+      const statusRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+        { headers: { 'x-goog-api-key': this.apiKey } },
+      );
+      if (!statusRes.ok) continue;
+      const status = await statusRes.json();
+      if (status.done) {
+        const videoBase64 = status.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.bytesBase64Encoded;
+        if (!videoBase64) {
+          throw new Error(`No video returned from Veo. Response: ${JSON.stringify(status).substring(0, 500)}`);
+        }
+        const buffer = Buffer.from(videoBase64, 'base64');
+        const filename = `insta-video-${Date.now()}.mp4`;
+        const { url } = await put(filename, buffer, {
+          access: 'public',
+          contentType: 'video/mp4',
+        });
+
+        // Clean up old videos
+        const { blobs } = await list({ prefix: 'insta-video-' });
+        const oldBlobs = blobs.filter((b) => b.url !== url);
+        if (oldBlobs.length > 0) {
+          await del(oldBlobs.map((b) => b.url));
+        }
+
+        return { videoUrl: url };
+      }
+      if (status.error) {
+        throw new Error(`Veo video generation failed: ${status.error.message || JSON.stringify(status.error)}`);
+      }
+    }
+    throw new Error('Video generation timed out after 5 minutes');
+  }
+
   async generateCaption(options: {
     prompt: string;
     style: string;
@@ -246,9 +334,9 @@ Hashtags: mix Japanese, Korean and English (e.g. #AI写真 #AI아트 #cinematicp
     };
 
     const modeInstruction: Record<string, string> = {
-      full: 'Generate both a caption and exactly 5 hashtags.',
+      full: 'Generate both a caption and 20-30 hashtags for maximum reach.',
       caption_only: 'Generate only a caption. Return empty string for hashtags.',
-      hashtags_only: 'Generate only exactly 5 hashtags. Return empty string for caption.',
+      hashtags_only: 'Generate only 20-30 hashtags for maximum reach. Return empty string for caption.',
     };
 
     let trendSection = '';
@@ -271,7 +359,7 @@ ${modeInstruction[options.mode]}
 Rules:
 - The caption should complement the image described by the prompt, not describe it literally
 - Keep the caption concise (2-4 lines max) and engaging
-- Hashtags must be exactly 5 tags, relevant to AI art and the image style (2026 Instagram policy)
+- Generate 20-30 hashtags for maximum reach. Mix popular high-volume tags with niche specific tags. Include a variety: AI art tags, style-specific tags, mood tags, and trending tags
 - Do NOT use generic hashtags like #ai or #photo alone — be specific
 - The tone should feel personal and authentic, not like marketing copy${trendSection}
 
@@ -279,7 +367,7 @@ Image prompt: "${options.prompt}"
 Image style: "${options.style}"
 
 Respond ONLY in this exact JSON format (no markdown, no code blocks):
-{"caption": "your caption here", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5"}`;
+{"caption": "your caption here", "hashtags": "#tag1 #tag2 #tag3 ... (20-30 tags)"}`;
 
     const res = await fetch(endpoint, {
       method: 'POST',

@@ -200,6 +200,9 @@ export class GoogleSheetsService {
       postTime: settingsMap.get('postTime') || '19:00',
       language: (settingsMap.get('language') || 'ko') as 'ko' | 'en',
       captionLanguage: (settingsMap.get('captionLanguage') || 'en') as AppSettings['captionLanguage'],
+      trendKeywords: settingsMap.get('trendKeywords') || '',
+      mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
+      stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
       instagramConnected: toBool(settingsMap.get('instagramConnected')),
       googleSheetsConnected: toBool(settingsMap.get('googleSheetsConnected')),
       geminiConnected: toBool(settingsMap.get('geminiConnected')),
@@ -214,6 +217,9 @@ export class GoogleSheetsService {
       ['postTime', merged.postTime],
       ['language', merged.language],
       ['captionLanguage', merged.captionLanguage],
+      ['trendKeywords', merged.trendKeywords || ''],
+      ['mediaType', merged.mediaType || 'image'],
+      ['stylePreset', merged.stylePreset || 'photorealistic'],
       ['instagramConnected', String(merged.instagramConnected)],
       ['googleSheetsConnected', String(merged.googleSheetsConnected)],
       ['geminiConnected', String(merged.geminiConnected)],
@@ -221,7 +227,7 @@ export class GoogleSheetsService {
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_SETTINGS}!A2:B8`,
+      range: `${SHEET_SETTINGS}!A2:B11`,
       valueInputOption: 'RAW',
       requestBody: { values: rows },
     });
