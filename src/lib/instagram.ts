@@ -65,13 +65,15 @@ export class InstagramService {
         return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Instagram] uploadPhoto attempt ${attempt}/${maxRetries} failed:`, lastError.message);
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         }
       }
     }
 
-    throw new Error(`Upload failed after ${maxRetries} attempts: ${lastError?.message}`);
+    console.error(`[Instagram] uploadPhoto failed after ${maxRetries} attempts. Last error:`, lastError?.message);
+    throw new Error(`업로드 ${maxRetries}회 실패: ${lastError?.message}`);
   }
 
   async uploadReels(videoUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
@@ -133,13 +135,15 @@ export class InstagramService {
         return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Instagram] uploadReels attempt ${attempt}/${maxRetries} failed:`, lastError.message);
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         }
       }
     }
 
-    throw new Error(`Reels upload failed after ${maxRetries} attempts: ${lastError?.message}`);
+    console.error(`[Instagram] uploadReels failed after ${maxRetries} attempts. Last error:`, lastError?.message);
+    throw new Error(`Reels 업로드 ${maxRetries}회 실패: ${lastError?.message}`);
   }
 
   async getMediaUrl(mediaId: string): Promise<string> {
