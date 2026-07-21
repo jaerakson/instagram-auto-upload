@@ -285,8 +285,22 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
         const videoUri = samples?.[0]?.video?.uri;
         if (videoUri) {
           // Veo URI는 2일 후 만료 → Vercel Blob에 영구 저장
-          const videoRes = await fetch(videoUri);
-          if (!videoRes.ok) throw new Error('Veo 동영상 다운로드 실패');
+          // URI에 API 키 인증이 필요할 수 있음
+          const downloadUrl = videoUri.includes('?')
+            ? `${videoUri}&key=${this.apiKey}`
+            : `${videoUri}?key=${this.apiKey}`;
+          let videoRes = await fetch(downloadUrl);
+          if (!videoRes.ok) {
+            // 키 없이 재시도
+            videoRes = await fetch(videoUri, {
+              headers: { 'x-goog-api-key': this.apiKey },
+            });
+          }
+          if (!videoRes.ok) {
+            // 인증 없이 재시도 (공개 URL일 수 있음)
+            videoRes = await fetch(videoUri);
+          }
+          if (!videoRes.ok) throw new Error(`Veo 동영상 다운로드 실패 (${videoRes.status}): ${videoUri.substring(0, 100)}`);
           const buffer = Buffer.from(await videoRes.arrayBuffer());
           const filename = `insta-video-${Date.now()}.mp4`;
           const { url } = await put(filename, buffer, {
