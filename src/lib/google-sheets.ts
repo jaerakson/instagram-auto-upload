@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
-import type { PostRecord, PerformanceRecord, AppSettings, StylePreset } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
+import type { PostRecord, PerformanceRecord, AppSettings, StylePreset, TrendPreset } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS } from '@/types';
 
 const SHEET_POSTS = '게시기록';
 const SHEET_PERFORMANCE = '성과';
@@ -223,13 +223,22 @@ export class GoogleSheetsService {
       stylePrompts[key] = sheetVal || DEFAULT_STYLE_PROMPTS[key];
     }
 
+    // 트렌드 키워드 프롬프트: 동일 패턴
+    const trendKeywordPrompts: Record<string, string> = {};
+    for (const key of Object.keys(DEFAULT_TREND_KEYWORDS) as TrendPreset[]) {
+      const sheetVal = settingsMap.get(`trendKeyword_${key}`);
+      trendKeywordPrompts[key] = sheetVal || DEFAULT_TREND_KEYWORDS[key];
+    }
+
     return {
       autoMode: toBool(settingsMap.get('autoMode')),
       postTime: settingsMap.get('postTime') || '19:00',
       language: (settingsMap.get('language') || 'ko') as 'ko' | 'en',
       captionLanguage: (settingsMap.get('captionLanguage') || 'en') as AppSettings['captionLanguage'],
+      trendPreset: (settingsMap.get('trendPreset') || 'portrait') as AppSettings['trendPreset'],
       trendKeywords: settingsMap.get('trendKeywords') || '',
       trendPrompt: settingsMap.get('trendPrompt') || DEFAULT_TREND_PROMPT,
+      trendKeywordPrompts,
       mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
       stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
       stylePrompts,
@@ -247,6 +256,7 @@ export class GoogleSheetsService {
       ['postTime', merged.postTime],
       ['language', merged.language],
       ['captionLanguage', merged.captionLanguage],
+      ['trendPreset', merged.trendPreset || 'portrait'],
       ['trendKeywords', merged.trendKeywords || ''],
       ['trendPrompt', merged.trendPrompt || DEFAULT_TREND_PROMPT],
       ['mediaType', merged.mediaType || 'image'],
@@ -260,6 +270,12 @@ export class GoogleSheetsService {
     const sp = merged.stylePrompts || {};
     for (const key of Object.keys(DEFAULT_STYLE_PROMPTS) as StylePreset[]) {
       rows.push([`stylePrompt_${key}`, sp[key] || DEFAULT_STYLE_PROMPTS[key]]);
+    }
+
+    // 트렌드 키워드 프롬프트 추가
+    const tkp = merged.trendKeywordPrompts || {};
+    for (const key of Object.keys(DEFAULT_TREND_KEYWORDS) as TrendPreset[]) {
+      rows.push([`trendKeyword_${key}`, tkp[key] || DEFAULT_TREND_KEYWORDS[key]]);
     }
 
     await this.sheets.spreadsheets.values.update({

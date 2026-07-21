@@ -23,7 +23,7 @@ import {
   Square,
   Save,
 } from 'lucide-react';
-import type { CaptionLanguage, MediaType, StylePreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import type { CaptionLanguage, MediaType, StylePreset, TrendPreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 import { cn } from '@/lib/utils';
 
 const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
@@ -32,6 +32,14 @@ const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
   { value: 'ko+en', labelKey: 'langKoEn' },
   { value: 'ja', labelKey: 'langJa' },
   { value: 'ja+ko', labelKey: 'langJaKo' },
+];
+
+const TREND_PRESET_OPTIONS: { value: TrendPreset; labelKey: string }[] = [
+  { value: 'portrait', labelKey: 'trendPortrait' },
+  { value: 'anime', labelKey: 'trendAnime' },
+  { value: 'dark_mood', labelKey: 'trendDarkMood' },
+  { value: 'minimal', labelKey: 'trendMinimal' },
+  { value: 'trend_tracking', labelKey: 'trendTracking' },
 ];
 
 const STYLE_PRESET_OPTIONS: { value: StylePreset; labelKey: string }[] = [
@@ -85,6 +93,7 @@ export default function CreatePage() {
   const abortRef = useRef<AbortController | null>(null);
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [stylePreset, setStylePreset] = useState<StylePreset>('photorealistic');
+  const [trendPreset, setTrendPreset] = useState<TrendPreset>('portrait');
   const [jobId, setJobId] = useState<string | null>(null);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
@@ -101,6 +110,7 @@ export default function CreatePage() {
           const s = settingsJson.data;
           if (s.mediaType) setMediaType(s.mediaType);
           if (s.stylePreset) setStylePreset(s.stylePreset);
+          if (s.trendPreset) setTrendPreset(s.trendPreset);
           if (s.captionLanguage) setCaptionLang(s.captionLanguage);
         }
       } catch { /* ignore */ }
@@ -759,6 +769,18 @@ export default function CreatePage() {
               {t('mediaReels')}
             </button>
           </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('trendPreset')}</label>
+          <select
+            value={trendPreset}
+            onChange={(e) => setTrendPreset(e.target.value as TrendPreset)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {TREND_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <label className="text-xs text-slate-500">{t('stylePreset')}</label>

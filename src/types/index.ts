@@ -32,14 +32,17 @@ export interface PerformanceRecord {
 export type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
 export type MediaType = 'image' | 'reels';
 export type StylePreset = 'photorealistic' | 'anime' | 'ghibli' | 'vintage_film' | 'watercolor' | '3d_render' | 'pop_art';
+export type TrendPreset = 'portrait' | 'anime' | 'dark_mood' | 'minimal' | 'trend_tracking';
 
 export interface AppSettings {
   autoMode: boolean;
   postTime: string;            // "19:00" 형식
   language: 'ko' | 'en';
   captionLanguage: CaptionLanguage;
+  trendPreset: TrendPreset;
   trendKeywords: string;
   trendPrompt: string;         // 트렌드 분석 프롬프트 (시트 커스텀)
+  trendKeywordPrompts: Record<string, string>; // 트렌드 프리셋별 키워드
   mediaType: MediaType;
   stylePreset: StylePreset;
   stylePrompts: Record<string, string>; // 스타일별 프롬프트 (시트 커스텀)
@@ -57,6 +60,14 @@ export const DEFAULT_STYLE_PROMPTS: Record<StylePreset, string> = {
   watercolor: 'watercolor painting, soft brushstrokes, bleeding colors, paper texture, artistic',
   '3d_render': '3D render, octane render, volumetric lighting, subsurface scattering, photorealistic CGI',
   pop_art: 'pop art style, bold flat colors, comic aesthetic, graphic design, halftone dots',
+};
+
+export const DEFAULT_TREND_KEYWORDS: Record<TrendPreset, string> = {
+  portrait: 'AI portrait, natural skin, golden hour, editorial fashion',
+  anime: 'anime AI art, Studio Ghibli, watercolor, lofi mood',
+  dark_mood: 'film noir, moody shadows, vintage grain, urban night',
+  minimal: 'minimal aesthetic, pastel tones, soft light, dreamy bokeh',
+  trend_tracking: 'Instagram AI art 2026, trending AI image',
 };
 
 export const DEFAULT_TREND_PROMPT = 'Search the web for the current Instagram AI art trends. What styles, aesthetics, and techniques are getting the most engagement right now?';
