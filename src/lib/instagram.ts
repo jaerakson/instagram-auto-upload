@@ -12,9 +12,24 @@ export class InstagramService {
     const res = await fetch(url, options);
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
-      throw new Error(error.error?.message || `Instagram API error: ${res.status}`);
+      const msg = error.error?.message || `Instagram API error: ${res.status}`;
+      const err = new Error(msg) as Error & { statusCode?: number };
+      err.statusCode = res.status;
+      throw err;
     }
     return res.json() as Promise<T>;
+  }
+
+  private isNonRetryableError(error: Error): boolean {
+    const msg = error.message.toLowerCase();
+    return (
+      msg.includes('request limit reached') ||
+      msg.includes('rate limit') ||
+      msg.includes('too many') ||
+      msg.includes('permission') ||
+      msg.includes('invalid oauth') ||
+      msg.includes('expired')
+    );
   }
 
   async uploadPhoto(imageUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
@@ -66,14 +81,18 @@ export class InstagramService {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Instagram] uploadPhoto attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (this.isNonRetryableError(lastError)) {
+          console.error(`[Instagram] 재시도 불가 에러 — 즉시 중단`);
+          break;
+        }
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         }
       }
     }
 
-    console.error(`[Instagram] uploadPhoto failed after ${maxRetries} attempts. Last error:`, lastError?.message);
-    throw new Error(`업로드 ${maxRetries}회 실패: ${lastError?.message}`);
+    console.error(`[Instagram] uploadPhoto failed. Last error:`, lastError?.message);
+    throw new Error(`업로드 실패: ${lastError?.message}`);
   }
 
   async uploadReels(videoUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
@@ -146,14 +165,18 @@ export class InstagramService {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Instagram] uploadReels attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (this.isNonRetryableError(lastError)) {
+          console.error(`[Instagram] 재시도 불가 에러 — 즉시 중단`);
+          break;
+        }
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         }
       }
     }
 
-    console.error(`[Instagram] uploadReels failed after ${maxRetries} attempts. Last error:`, lastError?.message);
-    throw new Error(`Reels 업로드 ${maxRetries}회 실패: ${lastError?.message}`);
+    console.error(`[Instagram] uploadReels failed. Last error:`, lastError?.message);
+    throw new Error(`Reels 업로드 실패: ${lastError?.message}`);
   }
 
   async getMediaUrl(mediaId: string): Promise<string> {
