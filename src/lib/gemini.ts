@@ -241,51 +241,35 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     options?: { aspectRatio?: string },
   ): Promise<{ videoUrl: string }> {
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-    const body = JSON.stringify({
-      instances: [{ prompt }],
-      parameters: {
-        aspectRatio: options?.aspectRatio || '9:16',
-        durationSeconds: 8,
-        sampleCount: 1,
-        personGeneration: 'allow_adult',
-      },
-    });
     const headers = {
       'Content-Type': 'application/json',
       'x-goog-api-key': this.apiKey,
     };
 
-    // Try multiple model/method combinations
-    const endpoints = [
-      `${baseUrl}/models/veo-2.0-generate-001:generateVideos`,
-      `${baseUrl}/models/veo-2.0-generate-001:predict`,
-      `${baseUrl}/models/veo-002:generateVideos`,
-    ];
+    // Veo 3.1 via predictLongRunning (공식 문서 기준)
+    const endpoint = `${baseUrl}/models/veo-3.1-generate-preview:predictLongRunning`;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: {
+          aspectRatio: options?.aspectRatio || '9:16',
+          numberOfVideos: 1,
+        },
+      }),
+    });
 
-    let lastError = '';
-    for (const endpoint of endpoints) {
-      const res = await fetch(endpoint, { method: 'POST', headers, body });
-      if (res.ok) {
-        const operation = await res.json();
-        return this.pollVideoOperation(operation.name);
-      }
+    if (!res.ok) {
       const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-      lastError = err.error?.message || `${res.status}`;
-      // If it's a "not found" error, try the next endpoint
-      if (res.status === 404 || lastError.includes('not found')) continue;
-      // For other errors (auth, quota), throw immediately
-      throw new Error(`Veo API error: ${lastError}`);
+      const msg = err.error?.message || `${res.status}`;
+      throw new Error(`Veo 동영상 생성 요청 실패: ${msg}`);
     }
 
-    throw new Error(
-      `동영상 생성 실패: Veo 모델을 사용할 수 없습니다. ` +
-      `Google AI Studio에서 Veo API 접근 권한을 확인하세요. (${lastError})`
-    );
-  }
+    const operation = await res.json();
+    const operationName = operation.name;
 
-  private async pollVideoOperation(operationName: string): Promise<{ videoUrl: string }> {
-    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-
+    // 폴링 (최대 5분, 10초 간격)
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 10000));
       const statusRes = await fetch(
@@ -294,26 +278,46 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       );
       if (!statusRes.ok) continue;
       const status = await statusRes.json();
+
       if (status.done) {
-        const videoBase64 = status.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.bytesBase64Encoded;
-        if (!videoBase64) {
-          throw new Error(`No video returned from Veo. Response: ${JSON.stringify(status).substring(0, 500)}`);
-        }
-        const buffer = Buffer.from(videoBase64, 'base64');
-        const filename = `insta-video-${Date.now()}.mp4`;
-        const { url } = await put(filename, buffer, {
-          access: 'public',
-          contentType: 'video/mp4',
-        });
+        // 응답에서 video URI 추출 (공식 문서: video.uri)
+        const samples = status.response?.generateVideoResponse?.generatedSamples;
+        const videoUri = samples?.[0]?.video?.uri;
+        if (videoUri) {
+          // Veo URI는 2일 후 만료 → Vercel Blob에 영구 저장
+          const videoRes = await fetch(videoUri);
+          if (!videoRes.ok) throw new Error('Veo 동영상 다운로드 실패');
+          const buffer = Buffer.from(await videoRes.arrayBuffer());
+          const filename = `insta-video-${Date.now()}.mp4`;
+          const { url } = await put(filename, buffer, {
+            access: 'public',
+            contentType: 'video/mp4',
+          });
 
-        const { blobs } = await list({ prefix: 'insta-video-' });
-        const oldBlobs = blobs.filter((b) => b.url !== url);
-        if (oldBlobs.length > 0) {
-          await del(oldBlobs.map((b) => b.url));
+          const { blobs } = await list({ prefix: 'insta-video-' });
+          const oldBlobs = blobs.filter((b) => b.url !== url);
+          if (oldBlobs.length > 0) {
+            await del(oldBlobs.map((b) => b.url));
+          }
+
+          return { videoUrl: url };
         }
 
-        return { videoUrl: url };
+        // fallback: base64 인코딩 응답
+        const videoBase64 = samples?.[0]?.video?.bytesBase64Encoded;
+        if (videoBase64) {
+          const buffer = Buffer.from(videoBase64, 'base64');
+          const filename = `insta-video-${Date.now()}.mp4`;
+          const { url } = await put(filename, buffer, {
+            access: 'public',
+            contentType: 'video/mp4',
+          });
+          return { videoUrl: url };
+        }
+
+        throw new Error(`Veo 응답에 동영상이 없습니다: ${JSON.stringify(status).substring(0, 500)}`);
       }
+
       if (status.error) {
         throw new Error(`Veo 동영상 생성 실패: ${status.error.message || JSON.stringify(status.error)}`);
       }
