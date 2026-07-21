@@ -251,7 +251,7 @@ export default function CreatePage() {
         const jobRes = await fetch('/api/pipeline/job', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mediaType, stylePreset, captionLang }),
+          body: JSON.stringify({ mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
         const jobJson = await jobRes.json();
@@ -300,7 +300,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport, mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
       }
@@ -341,7 +341,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl, mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
       }
@@ -390,7 +390,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 3, caption: generatedCaption, hashtags: generatedHashtags }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 3, caption: generatedCaption, hashtags: generatedHashtags, mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
       }
@@ -446,7 +446,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '' }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '', mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
         setJobId(null);
