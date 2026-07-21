@@ -518,6 +518,9 @@ export default function CreatePage() {
             imageUrl: imageStep?.imageUrl || '',
             caption: editCaption,
             hashtags: editHashtags,
+            mediaType,
+            stylePreset,
+            captionLang,
           }),
         });
       } else {
