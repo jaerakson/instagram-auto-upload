@@ -70,7 +70,13 @@
     "styleVintageFilm": "Vintage Film",
     "styleWatercolor": "Watercolor",
     "style3dRender": "3D Render",
-    "stylePopArt": "Pop Art"
+    "stylePopArt": "Pop Art",
+    "saveProgress": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "resumeConfirm": "Previous work found. Resume?",
+    "resumeYes": "Resume",
+    "resumeNo": "Start New"
   },
   "history": {
     "title": "History",

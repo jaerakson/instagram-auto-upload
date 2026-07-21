@@ -25,7 +25,7 @@ export class GoogleSheetsService {
   async getPosts(): Promise<PostRecord[]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A2:N`,
+      range: `${SHEET_POSTS}!A2:P`,
     });
     const rows = res.data.values || [];
     return rows.map((row) => ({
@@ -40,13 +40,17 @@ export class GoogleSheetsService {
       status: (row[8] || 'pending') as PostRecord['status'],
       trendReport: row[9] || '',
       style: row[10] || '',
+      currentStep: row[11] ? Number(row[11]) : undefined,
+      mediaType: row[12] || undefined,
+      stylePreset: row[13] || undefined,
+      captionLang: row[14] || undefined,
     }));
   }
 
   async addPost(post: PostRecord): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A:N`,
+      range: `${SHEET_POSTS}!A:P`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -61,6 +65,10 @@ export class GoogleSheetsService {
           post.status,
           post.trendReport,
           post.style,
+          post.currentStep ?? '',
+          post.mediaType ?? '',
+          post.stylePreset ?? '',
+          post.captionLang ?? '',
         ]],
       },
     });
@@ -80,7 +88,7 @@ export class GoogleSheetsService {
     const rowNumber = rowIndex + 2; // 1-indexed + header row
     const currentRow = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:N${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:P${rowNumber}`,
     });
     const current = currentRow.data.values?.[0] || [];
 
@@ -96,14 +104,26 @@ export class GoogleSheetsService {
       updates.status ?? current[8] ?? '',
       updates.trendReport ?? current[9] ?? '',
       updates.style ?? current[10] ?? '',
+      updates.currentStep ?? current[11] ?? '',
+      updates.mediaType ?? current[12] ?? '',
+      updates.stylePreset ?? current[13] ?? '',
+      updates.captionLang ?? current[14] ?? '',
     ];
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:N${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:P${rowNumber}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [merged] },
     });
+  }
+
+  async getPendingJob(): Promise<PostRecord | null> {
+    const posts = await this.getPosts();
+    const pending = posts
+      .filter(p => p.status === 'pending' && p.currentStep !== undefined && p.currentStep < 4)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return pending[0] || null;
   }
 
   // 성과 CRUD

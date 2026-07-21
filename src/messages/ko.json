@@ -70,7 +70,13 @@
     "styleVintageFilm": "빈티지 필름",
     "styleWatercolor": "수채화",
     "style3dRender": "3D 렌더",
-    "stylePopArt": "팝아트"
+    "stylePopArt": "팝아트",
+    "saveProgress": "저장",
+    "saving": "저장 중...",
+    "saved": "저장됨",
+    "resumeConfirm": "이전 작업이 있습니다. 이어하시겠습니까?",
+    "resumeYes": "이어하기",
+    "resumeNo": "새로 시작"
   },
   "history": {
     "title": "작업 내역",

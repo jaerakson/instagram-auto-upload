@@ -11,6 +11,10 @@ export interface PostRecord {
   status: 'pending' | 'published' | 'failed';
   trendReport: string;         // 트렌드 분석 요약
   style: string;               // 이미지 스타일 키워드
+  currentStep?: number;        // 0=created, 1=trend, 2=image, 3=caption, 4=uploaded
+  mediaType?: string;          // 'image' | 'reels'
+  stylePreset?: string;        // style preset used
+  captionLang?: string;        // caption language used
 }
 
 // Google Sheets "성과" 시트 행

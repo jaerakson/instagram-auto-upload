@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Film,
   Square,
+  Save,
 } from 'lucide-react';
 import type { CaptionLanguage, MediaType, StylePreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
 import { cn } from '@/lib/utils';
@@ -84,6 +85,25 @@ export default function CreatePage() {
   const abortRef = useRef<AbortController | null>(null);
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [stylePreset, setStylePreset] = useState<StylePreset>('photorealistic');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [savedProgress, setSavedProgress] = useState(false);
+  const [pendingJob, setPendingJob] = useState<any>(null);
+
+  useEffect(() => {
+    async function checkPendingJob() {
+      try {
+        const res = await fetch('/api/pipeline/job');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setShowResumeBanner(true);
+          setPendingJob(json.data);
+        }
+      } catch { /* ignore */ }
+    }
+    checkPendingJob();
+  }, []);
 
   const isAllComplete = pipeline.every((s) => s.status === 'complete');
   const isUploadComplete = pipeline[3].status === 'complete';
@@ -98,6 +118,7 @@ export default function CreatePage() {
     setErrorMsg('');
     setAutoProgress(0);
     setAutoStepLabel('');
+    setJobId(null);
   }
 
   function handleCancel() {
@@ -201,6 +222,22 @@ export default function CreatePage() {
     setAutoProgress(5);
     setAutoStepLabel(t('step1'));
     try {
+      // Create job in Sheets
+      let currentJobId = jobId;
+      if (!currentJobId) {
+        const jobRes = await fetch('/api/pipeline/job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaType, stylePreset, captionLang }),
+          signal,
+        });
+        const jobJson = await jobRes.json();
+        if (jobJson.success) {
+          currentJobId = jobJson.data.id;
+          setJobId(currentJobId);
+        }
+      }
+
       // Step 1: Trend analysis + prompt generation
       setGeneratingPrompt(true);
       const promptRes = await fetch('/api/generate-prompt', {
@@ -236,6 +273,15 @@ export default function CreatePage() {
       setAutoProgress(25);
       setAutoStepLabel(t(mediaType === 'reels' ? 'step2Reels' : 'step2'));
 
+      if (currentJobId) {
+        await fetch('/api/pipeline/job', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport }),
+          signal,
+        });
+      }
+
       // Step 2: Image generation
       setPipeline((prev) => {
         const next = [...prev];
@@ -267,6 +313,15 @@ export default function CreatePage() {
         next[1] = { step: 'image', status: 'complete', result: imageResult };
         return next;
       });
+
+      if (currentJobId) {
+        await fetch('/api/pipeline/job', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl }),
+          signal,
+        });
+      }
 
       // Step 3: Caption generation
       setAutoProgress(50);
@@ -307,6 +362,15 @@ export default function CreatePage() {
         next[2] = { step: 'caption', status: 'complete', result: captionResult };
         return next;
       });
+
+      if (currentJobId) {
+        await fetch('/api/pipeline/job', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentJobId, currentStep: 3, caption: generatedCaption, hashtags: generatedHashtags }),
+          signal,
+        });
+      }
 
       // Step 4: Upload
       setAutoProgress(75);
@@ -355,6 +419,15 @@ export default function CreatePage() {
         }),
         signal,
       });
+      if (currentJobId) {
+        await fetch('/api/pipeline/job', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '' }),
+          signal,
+        });
+        setJobId(null);
+      }
       setAutoProgress(100);
       setAutoStepLabel(t('complete'));
       setPipeline((prev) => {
@@ -380,6 +453,84 @@ export default function CreatePage() {
       setAutoAllRunning(false);
       abortRef.current = null;
     }
+  }
+
+  function handleResume() {
+    if (!pendingJob) return;
+    const job = pendingJob;
+    setJobId(job.id);
+    setPrompt(job.prompt || '');
+    setStyle(job.style || '');
+    setEditCaption(job.caption || '');
+    setEditHashtags(job.hashtags || '');
+    setTrendReport(job.trendReport || '');
+    if (job.mediaType) setMediaType(job.mediaType);
+    if (job.stylePreset) setStylePreset(job.stylePreset);
+    if (job.captionLang) setCaptionLang(job.captionLang);
+
+    const step = job.currentStep || 0;
+    setPipeline(prev => {
+      const next = [...prev];
+      if (step >= 1) next[0] = { step: 'trend', status: 'complete', result: { summary: job.trendReport || '', topStyles: job.style ? job.style.split(',').map((s: string) => s.trim()) : [], keywords: [], hashtags: [], avoidList: [] } };
+      if (step >= 2) next[1] = { step: 'image', status: 'complete', result: { imageUrl: job.imageUrl || '', prompt: job.prompt || '', designIntent: job.style || '', model: job.mediaType === 'reels' ? 'veo-3.1-generate-preview' : 'imagen-4.0-generate-001', imageSize: job.mediaType === 'reels' ? '9:16' : '1:1', mediaType: job.mediaType } };
+      if (step >= 3) next[2] = { step: 'caption', status: 'complete', result: { caption: job.caption || '', hashtags: job.hashtags || '', fullText: `${job.caption}\n\n${job.hashtags}`.trim(), strategy: 'restored' } };
+      return next;
+    });
+
+    setShowResumeBanner(false);
+    setPendingJob(null);
+  }
+
+  function handleDiscardResume() {
+    setShowResumeBanner(false);
+    setPendingJob(null);
+  }
+
+  async function handleSaveProgress() {
+    setSavingProgress(true);
+    try {
+      const currentStep = pipeline.filter(s => s.status === 'complete').length;
+      const imageStep = pipeline[1].result as ImageResult | undefined;
+
+      if (jobId) {
+        await fetch('/api/pipeline/job', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: jobId,
+            currentStep,
+            prompt: prompt.trim(),
+            style,
+            trendReport,
+            imageUrl: imageStep?.imageUrl || '',
+            caption: editCaption,
+            hashtags: editHashtags,
+          }),
+        });
+      } else {
+        const res = await fetch('/api/pipeline/job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentStep,
+            prompt: prompt.trim(),
+            style,
+            trendReport,
+            imageUrl: imageStep?.imageUrl || '',
+            caption: editCaption,
+            hashtags: editHashtags,
+            mediaType,
+            stylePreset,
+            captionLang,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) setJobId(json.data.id);
+      }
+      setSavedProgress(true);
+      setTimeout(() => setSavedProgress(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSavingProgress(false); }
   }
 
   function canRun(stepIndex: number) {
@@ -529,6 +680,23 @@ export default function CreatePage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
 
+      {showResumeBanner && pendingJob && (
+        <div className="flex items-center justify-between rounded-lg border border-blue-800 bg-blue-950/50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-blue-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{t('resumeConfirm')} (Step {pendingJob.currentStep}/4)</span>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleResume} className="bg-blue-600 text-white hover:bg-blue-700">
+              {t('resumeYes')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleDiscardResume} className="border-slate-700 text-slate-300 hover:bg-slate-800">
+              {t('resumeNo')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -606,6 +774,21 @@ export default function CreatePage() {
             <Play className="mr-2 h-5 w-5" />{t('autoAll')}
           </Button>
         )}
+        <Button
+          size="lg"
+          variant="outline"
+          disabled={savingProgress || (!prompt.trim() && !editCaption.trim())}
+          onClick={handleSaveProgress}
+          className="border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40 h-14 rounded-xl shrink-0"
+        >
+          {savedProgress ? (
+            <><CheckCircle2 className="mr-2 h-5 w-5" />{t('saved')}</>
+          ) : savingProgress ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('saving')}</>
+          ) : (
+            <><Save className="mr-2 h-5 w-5" />{t('saveProgress')}</>
+          )}
+        </Button>
       </div>
 
       {/* Progress Bar */}
