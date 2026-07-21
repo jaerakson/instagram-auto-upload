@@ -477,7 +477,7 @@ export default function CreatePage() {
     }
   }
 
-  const stepTitleKeys = ['step1', 'step2', 'step3', 'step4'] as const;
+  const stepTitleKeys = ['step1', mediaType === 'reels' ? 'step2Reels' : 'step2', 'step3', 'step4'] as const;
 
   return (
     <div className="space-y-6">
@@ -557,9 +557,10 @@ export default function CreatePage() {
       </div>
 
       <div className="space-y-4">
-        {steps.map(({ step, icon: Icon }, i) => {
+        {steps.map(({ step, icon: StepIcon }, i) => {
           const pipelineStep = pipeline[i];
           const isRunnable = canRun(i);
+          const Icon = step === 'image' && mediaType === 'reels' ? Film : StepIcon;
 
           return (
             <Card key={step} className="border-slate-800 bg-slate-900">
@@ -605,7 +606,7 @@ export default function CreatePage() {
                       className="border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
                     >
                       {pipelineStep.status === 'running' ? (
-                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('generatingImage')}</>
+                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t(mediaType === 'reels' ? 'generatingVideo' : 'generatingImage')}</>
                       ) : (
                         t('run')
                       )}
