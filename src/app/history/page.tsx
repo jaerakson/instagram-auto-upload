@@ -109,6 +109,7 @@ export default function HistoryPage() {
               <TableHead className="text-slate-400 text-right">{t('likes')}</TableHead>
               <TableHead className="text-slate-400 text-right">{t('comments')}</TableHead>
               <TableHead className="text-slate-400 text-center">{t('status')}</TableHead>
+              <TableHead className="text-slate-400 text-center">Link</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -122,7 +123,16 @@ export default function HistoryPage() {
                   onClick={() => setSelected(post)}
                 >
                   <TableCell className="py-2">
-                    {imgSrc ? (
+                    {imgSrc?.endsWith('.mp4') ? (
+                      <video
+                        src={imgSrc}
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        className="h-12 w-12 rounded-lg object-cover"
+                      />
+                    ) : imgSrc ? (
                       <img
                         src={imgSrc}
                         alt=""
@@ -156,6 +166,21 @@ export default function HistoryPage() {
                   <TableCell className="text-center">
                     <StatusBadge status={post.status} />
                   </TableCell>
+                  <TableCell className="text-center">
+                    {post.mediaUrl ? (
+                      <a
+                        href={post.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                      >
+                        Instagram →
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-600">-</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -176,11 +201,22 @@ export default function HistoryPage() {
               </SheetHeader>
               <div className="mt-4 space-y-5">
                 {selected.imageUrl && (
-                  <img
-                    src={selected.imageUrl}
-                    alt=""
-                    className="w-full rounded-xl object-cover"
-                  />
+                  selected.imageUrl.endsWith('.mp4') ? (
+                    <video
+                      src={selected.imageUrl}
+                      controls
+                      autoPlay
+                      loop
+                      playsInline
+                      className="w-full rounded-xl"
+                    />
+                  ) : (
+                    <img
+                      src={selected.imageUrl}
+                      alt=""
+                      className="w-full rounded-xl object-cover"
+                    />
+                  )
                 )}
                 {selected.mediaUrl && (
                   <a

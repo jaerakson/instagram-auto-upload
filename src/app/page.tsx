@@ -124,21 +124,45 @@ export default function DashboardPage() {
                 className="group overflow-hidden rounded-xl border border-slate-800 bg-slate-950 transition-colors hover:border-slate-700"
               >
                 <div className="aspect-square overflow-hidden">
-                  <img
-                    src={post.mediaUrl || post.imageUrl}
-                    alt={post.caption}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    width={400}
-                    height={400}
-                  />
+                  {post.imageUrl?.endsWith('.mp4') ? (
+                    <video
+                      src={post.imageUrl}
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.caption}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      width={400}
+                      height={400}
+                    />
+                  )}
                 </div>
                 <div className="p-3">
                   <p className="line-clamp-2 text-sm text-slate-300">
                     {post.caption}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {new Date(post.date).toLocaleDateString()}
-                  </p>
+                  <div className="mt-1 flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      {new Date(post.date).toLocaleDateString()}
+                    </p>
+                    {post.mediaUrl && (
+                      <a
+                        href={post.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                      >
+                        Instagram →
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
