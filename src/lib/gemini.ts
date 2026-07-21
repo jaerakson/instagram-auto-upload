@@ -240,37 +240,56 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     prompt: string,
     options?: { aspectRatio?: string },
   ): Promise<{ videoUrl: string }> {
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos';
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': this.apiKey,
+    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    const body = JSON.stringify({
+      instances: [{ prompt }],
+      parameters: {
+        aspectRatio: options?.aspectRatio || '9:16',
+        durationSeconds: 8,
+        sampleCount: 1,
+        personGeneration: 'allow_adult',
       },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: {
-          aspectRatio: options?.aspectRatio || '9:16',
-          durationSeconds: 8,
-          sampleCount: 1,
-        },
-      }),
     });
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': this.apiKey,
+    };
 
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
-      throw new Error(error.error?.message || `Gemini Veo API error: ${res.status}`);
+    // Try multiple model/method combinations
+    const endpoints = [
+      `${baseUrl}/models/veo-2.0-generate-001:generateVideos`,
+      `${baseUrl}/models/veo-2.0-generate-001:predict`,
+      `${baseUrl}/models/veo-002:generateVideos`,
+    ];
+
+    let lastError = '';
+    for (const endpoint of endpoints) {
+      const res = await fetch(endpoint, { method: 'POST', headers, body });
+      if (res.ok) {
+        const operation = await res.json();
+        return this.pollVideoOperation(operation.name);
+      }
+      const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      lastError = err.error?.message || `${res.status}`;
+      // If it's a "not found" error, try the next endpoint
+      if (res.status === 404 || lastError.includes('not found')) continue;
+      // For other errors (auth, quota), throw immediately
+      throw new Error(`Veo API error: ${lastError}`);
     }
 
-    const operation = await res.json();
-    const operationName = operation.name;
+    throw new Error(
+      `동영상 생성 실패: Veo 모델을 사용할 수 없습니다. ` +
+      `Google AI Studio에서 Veo API 접근 권한을 확인하세요. (${lastError})`
+    );
+  }
 
-    // Poll for completion (max 5 minutes, 10s intervals)
+  private async pollVideoOperation(operationName: string): Promise<{ videoUrl: string }> {
+    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 10000));
       const statusRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+        `${baseUrl}/${operationName}`,
         { headers: { 'x-goog-api-key': this.apiKey } },
       );
       if (!statusRes.ok) continue;
@@ -287,7 +306,6 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
           contentType: 'video/mp4',
         });
 
-        // Clean up old videos
         const { blobs } = await list({ prefix: 'insta-video-' });
         const oldBlobs = blobs.filter((b) => b.url !== url);
         if (oldBlobs.length > 0) {
@@ -297,10 +315,10 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
         return { videoUrl: url };
       }
       if (status.error) {
-        throw new Error(`Veo video generation failed: ${status.error.message || JSON.stringify(status.error)}`);
+        throw new Error(`Veo 동영상 생성 실패: ${status.error.message || JSON.stringify(status.error)}`);
       }
     }
-    throw new Error('Video generation timed out after 5 minutes');
+    throw new Error('동영상 생성 타임아웃 (5분 초과)');
   }
 
   async generateCaption(options: {

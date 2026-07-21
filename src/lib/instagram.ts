@@ -17,7 +17,7 @@ export class InstagramService {
     return res.json() as Promise<T>;
   }
 
-  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 5): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
+  async uploadPhoto(imageUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -74,7 +74,7 @@ export class InstagramService {
     throw new Error(`Upload failed after ${maxRetries} attempts: ${lastError?.message}`);
   }
 
-  async uploadReels(videoUrl: string, caption: string, maxRetries = 3): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
+  async uploadReels(videoUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
