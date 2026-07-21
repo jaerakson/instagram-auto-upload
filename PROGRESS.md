@@ -1,3 +1,25 @@
+## 2026-07-21 17:30 (집) — v2.0: Reels 동영상 + 스타일 프리셋
+- 브랜치: main
+- 완료:
+  - **Reels 동영상 지원**: Veo 3.1 API 연동 (predictLongRunning + video.uri 다운로드 → Vercel Blob 저장)
+  - Instagram Reels 업로드 (media_type: REELS + 상태 폴링)
+  - API 라우트 분기: /api/generate (type=image|reels), /api/instagram/upload (mediaType 분기)
+  - 캡션에 [image prompt] 섹션 자동 포함 (수동+자동 4곳)
+  - **스타일 프리셋 7종**: 실사(기본)/애니메이션/지브리/빈티지필름/수채화/3D렌더/팝아트
+  - generatePrompt()에 스타일 지시어 주입 → AI가 해당 스타일로 프롬프트 생성
+  - 설정 페이지: 자동모드에서 mediaType + stylePreset 선택 가능
+  - Google Sheets 설정에 stylePreset 읽기/쓰기 연동
+  - 업로드 재시도 횟수 5→10회 (uploadPhoto, uploadReels 모두)
+  - 동영상 모드 시 UI 동적 변경 (제목: 동영상 생성, 아이콘: Film, 버튼: 동영상 생성 중...)
+  - Veo API 디버깅: 모델명(veo-3.1-generate-preview), 메서드(predictLongRunning), 파라미터(sampleCount), 다운로드 인증(3방식 순차 시도)
+- 현재 상태: **v2.0 완성. 이미지/동영상 모두 정상 동작. 동영상 생성 테스트 완료 (5.8MB MP4).**
+- 다음 할 일:
+  - 동영상 Reels 업로드 실제 테스트 (Instagram Graph API)
+  - 대시보드 실제 데이터 연동
+  - 모바일 반응형 개선
+- 관련 커밋: 23f2912 ~ f72713e (6개 커밋)
+- 푸시 여부: origin/main 에 푸시 완료
+
 ## 2026-07-20 20:30 (집) — 프로젝트 v1.0 완성
 - 브랜치: main
 - 완료:
