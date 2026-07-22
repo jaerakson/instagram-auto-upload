@@ -1,3 +1,18 @@
+## 2026-07-22 08:00 (집) — fix: 수동 게시물 생성 시 비용 추적 누락 수정
+- 브랜치: main
+- 완료:
+  - **수동 트렌드 분석** (`handleAutoGenerate`): API 응답의 totalTokens/totalCost → state 누적 추가
+  - **수동 캡션 생성** (`handleGenerateCaption`): API 응답의 totalTokens/totalCost → state 누적 추가
+  - **수동 이미지 생성** (`runStep('image')`): IMAGE_QUALITY_COSTS 기반 비용 추가 + Drive 자동저장 연동
+  - **비용 표시 조건**: `totalTokens > 0 || totalCost > 0` (이미지만 생성해도 비용 영역 표시)
+  - 원인: handleAutoAll()에서만 비용 추적, 수동 단계별 실행 함수들에서는 누적 없었음
+- 현재 상태: **수정 완료. 빌드 정상.**
+- 다음 할 일:
+  - 모바일 반응형 개선
+  - 성과 분석 페이지 동영상/이미지 비교 분석
+- 관련 커밋: 8d74f73
+- 푸시 여부: origin/main 에 푸시 완료
+
 ## 2026-07-22 07:00 (집) — v3.2: 실패 tooltip + 수동 이미지 + 단계별 비용 + 비용 표시 개선
 - 브랜치: main
 - 완료:
