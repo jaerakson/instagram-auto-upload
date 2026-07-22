@@ -99,7 +99,20 @@
     "prompt": "프롬프트",
     "trendReport": "트렌드 리포트",
     "fullCaption": "전체 캡션",
-    "noData": "게시물이 없습니다"
+    "noData": "게시물이 없습니다",
+    "filterAll": "전체",
+    "searchPlaceholder": "캡션/프롬프트 검색...",
+    "sortDate": "날짜순",
+    "sortCost": "비용순",
+    "sortLikes": "좋아요순",
+    "actions": "관리",
+    "retry": "재시도",
+    "confirmDelete": "삭제",
+    "cancelDelete": "취소",
+    "retryCountLabel": "재시도 {count}회",
+    "errorReason": "실패 사유",
+    "totalTokens": "총 Tokens",
+    "totalCost": "총 비용"
   },
   "analytics": {
     "title": "성과 분석",

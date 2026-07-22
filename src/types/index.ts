@@ -18,6 +18,8 @@ export interface PostRecord {
   trendPreset?: string;        // trend preset used
   totalTokens?: number;        // 총 토큰 사용량
   totalCost?: number;          // 총 비용 (USD)
+  retryCount?: number;         // 재시도 횟수
+  error?: string;              // 실패 사유
 }
 
 // Google Sheets "성과" 시트 행

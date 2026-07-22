@@ -26,7 +26,7 @@ export class GoogleSheetsService {
   async getPosts(): Promise<PostRecord[]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A2:R`,
+      range: `${SHEET_POSTS}!A2:T`,
     });
     const rows = res.data.values || [];
     return rows.map((row) => ({
@@ -48,13 +48,15 @@ export class GoogleSheetsService {
       trendPreset: row[15] || undefined,
       totalTokens: row[16] ? Number(row[16]) : undefined,
       totalCost: row[17] ? Number(row[17]) : undefined,
+      retryCount: row[18] ? Number(row[18]) : undefined,
+      error: row[19] || undefined,
     }));
   }
 
   async addPost(post: PostRecord): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A:R`,
+      range: `${SHEET_POSTS}!A:T`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -76,6 +78,8 @@ export class GoogleSheetsService {
           post.trendPreset ?? '',
           post.totalTokens ?? '',
           post.totalCost ?? '',
+          post.retryCount ?? '',
+          post.error ?? '',
         ]],
       },
     });
@@ -95,7 +99,7 @@ export class GoogleSheetsService {
     const rowNumber = rowIndex + 2; // 1-indexed + header row
     const currentRow = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:R${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:T${rowNumber}`,
     });
     const current = currentRow.data.values?.[0] || [];
 
@@ -118,13 +122,35 @@ export class GoogleSheetsService {
       updates.trendPreset ?? current[15] ?? '',
       updates.totalTokens ?? current[16] ?? '',
       updates.totalCost ?? current[17] ?? '',
+      updates.retryCount ?? current[18] ?? '',
+      updates.error ?? current[19] ?? '',
     ];
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:R${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:T${rowNumber}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [merged] },
+    });
+  }
+
+  async deletePost(id: string): Promise<void> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_POSTS}!A2:A`,
+    });
+    const ids = res.data.values || [];
+    const rowIndex = ids.findIndex((row) => row[0] === id);
+    if (rowIndex === -1) {
+      throw new Error(`Post with id ${id} not found`);
+    }
+    const rowNumber = rowIndex + 2;
+    const emptyRow = Array(20).fill('');
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_POSTS}!A${rowNumber}:T${rowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [emptyRow] },
     });
   }
 

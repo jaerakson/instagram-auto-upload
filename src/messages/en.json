@@ -99,7 +99,20 @@
     "prompt": "Prompt",
     "trendReport": "Trend Report",
     "fullCaption": "Full Caption",
-    "noData": "No posts yet"
+    "noData": "No posts yet",
+    "filterAll": "All",
+    "searchPlaceholder": "Search caption/prompt...",
+    "sortDate": "By Date",
+    "sortCost": "By Cost",
+    "sortLikes": "By Likes",
+    "actions": "Actions",
+    "retry": "Retry",
+    "confirmDelete": "Delete",
+    "cancelDelete": "Cancel",
+    "retryCountLabel": "Retry {count}x",
+    "errorReason": "Error",
+    "totalTokens": "Total Tokens",
+    "totalCost": "Total Cost"
   },
   "analytics": {
     "title": "Analytics",

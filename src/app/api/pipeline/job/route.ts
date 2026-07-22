@@ -43,6 +43,21 @@ export async function POST(request: Request) {
   }
 }
 
+// DELETE: pending 작업을 failed로 마킹
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json();
+    if (!id) {
+      return NextResponse.json<ApiResponse>({ success: false, error: 'id is required' }, { status: 400 });
+    }
+    await sheetsService.updatePost(id, { status: 'failed', error: '사용자 취소' });
+    return NextResponse.json<ApiResponse>({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json<ApiResponse>({ success: false, error: message }, { status: 500 });
+  }
+}
+
 // PUT: 작업 단계 업데이트
 export async function PUT(request: Request) {
   try {

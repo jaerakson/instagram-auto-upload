@@ -101,6 +101,15 @@ export default function CreatePage() {
   const [savingProgress, setSavingProgress] = useState(false);
   const [savedProgress, setSavedProgress] = useState(false);
   const [pendingJob, setPendingJob] = useState<any>(null);
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Fetch USD→KRW exchange rate
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(r => r.json())
+      .then(d => { if (d.rates?.KRW) setExchangeRate(d.rates.KRW); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -116,6 +125,18 @@ export default function CreatePage() {
           if (s.captionLanguage) setCaptionLang(s.captionLanguage);
         }
       } catch { /* ignore */ }
+
+      // Check for retry from history page
+      const retryData = sessionStorage.getItem('retryPost');
+      if (retryData) {
+        sessionStorage.removeItem('retryPost');
+        try {
+          const job = JSON.parse(retryData);
+          setPendingJob(job);
+          setShowResumeBanner(true);
+          return; // skip pending job check since we have retry data
+        } catch { /* ignore */ }
+      }
 
       // 미완료 작업 체크
       try {
@@ -522,7 +543,16 @@ export default function CreatePage() {
     setPendingJob(null);
   }
 
-  function handleDiscardResume() {
+  async function handleDiscardResume() {
+    if (pendingJob?.id) {
+      try {
+        await fetch('/api/pipeline/job', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: pendingJob.id }),
+        });
+      } catch { /* ignore */ }
+    }
     setShowResumeBanner(false);
     setPendingJob(null);
   }
@@ -869,7 +899,7 @@ export default function CreatePage() {
           {totalTokens > 0 && (
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
-              <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}</span></span>
+              <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
             </div>
           )}
         </div>

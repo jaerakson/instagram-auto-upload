@@ -1,4 +1,4 @@
-import { put, list, del } from '@vercel/blob';
+import { put } from '@vercel/blob';
 import type { TrendResult, PerformanceRecord, UsageInfo } from '@/types';
 
 export class GeminiService {
@@ -238,12 +238,8 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       contentType: 'image/png',
     });
 
-    // Delete previous images only after new one is safely stored
-    const { blobs } = await list({ prefix: 'insta-' });
-    const oldBlobs = blobs.filter((b) => b.url !== url);
-    if (oldBlobs.length > 0) {
-      await del(oldBlobs.map((b) => b.url));
-    }
+    // Blob cleanup is now handled by explicit delete actions (history page / API)
+    // to preserve pending/failed post images
 
     return { imageUrl: url };
   }
@@ -320,12 +316,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
             contentType: 'video/mp4',
           });
 
-          const { blobs } = await list({ prefix: 'insta-video-' });
-          const oldBlobs = blobs.filter((b) => b.url !== url);
-          if (oldBlobs.length > 0) {
-            await del(oldBlobs.map((b) => b.url));
-          }
-
+          // Blob cleanup is now handled by explicit delete actions
           return { videoUrl: url };
         }
 
