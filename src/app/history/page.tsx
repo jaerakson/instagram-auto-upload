@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import type { PostRecord, PerformanceRecord } from '@/types';
 type StatusFilter = 'all' | 'published' | 'failed' | 'pending';
 type SortKey = 'date' | 'cost' | 'likes';
 
-function StatusBadge({ status }: { status: PostRecord['status'] }) {
+function StatusBadge({ status, error }: { status: PostRecord['status']; error?: string }) {
   const t = useTranslations('history');
   const map: Record<PostRecord['status'], { variant: 'default' | 'secondary' | 'destructive'; label: string }> = {
     published: { variant: 'default', label: t('published') },
@@ -37,11 +37,22 @@ function StatusBadge({ status }: { status: PostRecord['status'] }) {
     failed: { variant: 'destructive', label: t('failed') },
   };
   const { variant, label } = map[status];
+  if (status === 'failed' && error) {
+    return (
+      <span className="group relative">
+        <Badge variant={variant} className="cursor-help">{label}</Badge>
+        <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-red-800/50 text-xs text-red-300 whitespace-nowrap max-w-[250px] truncate z-50 shadow-lg">
+          {error}
+        </span>
+      </span>
+    );
+  }
   return <Badge variant={variant}>{label}</Badge>;
 }
 
 export default function HistoryPage() {
   const t = useTranslations('history');
+  const locale = useLocale();
   const router = useRouter();
   const [selected, setSelected] = useState<PostRecord | null>(null);
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -93,10 +104,18 @@ export default function HistoryPage() {
     return performance.find((p) => p.mediaId === mediaId);
   }
 
-  function formatCostKrw(cost: number): string {
+  function formatCostDisplay(cost: number): { primary: string; tooltip: string } {
     const krw = exchangeRate ? cost * exchangeRate : null;
-    const krwStr = krw !== null ? ` (≈${Math.round(krw).toLocaleString()}원)` : '';
-    return `$${cost.toFixed(4)}${krwStr}`;
+    if (locale === 'ko' && krw !== null) {
+      return {
+        primary: `≈${Math.round(krw).toLocaleString()}원`,
+        tooltip: `$${cost.toFixed(4)} / ≈${Math.round(krw).toLocaleString()}원`,
+      };
+    }
+    return {
+      primary: `$${cost.toFixed(4)}`,
+      tooltip: krw !== null ? `$${cost.toFixed(4)} / ≈${Math.round(krw).toLocaleString()}원` : `$${cost.toFixed(4)}`,
+    };
   }
 
   // Filter + search + sort
@@ -223,7 +242,9 @@ export default function HistoryPage() {
         {totalTokensSum > 0 && (
           <div className="flex items-center gap-4 text-xs text-slate-500">
             <span>{t('totalTokens')}: <span className="text-slate-300 font-mono">{totalTokensSum.toLocaleString()}</span></span>
-            <span>{t('totalCost')}: <span className="text-emerald-400 font-mono">{formatCostKrw(totalCostSum)}</span></span>
+            <span className="group relative cursor-help">{t('totalCost')}: <span className="text-emerald-400 font-mono">{formatCostDisplay(totalCostSum).primary}</span>
+              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{formatCostDisplay(totalCostSum).tooltip}</span>
+            </span>
           </div>
         )}
       </div>
@@ -357,11 +378,16 @@ export default function HistoryPage() {
                     {perf?.comments ?? '-'}
                   </TableCell>
                   <TableCell className="text-right text-xs font-mono text-emerald-400">
-                    {post.totalCost ? formatCostKrw(post.totalCost) : '-'}
+                    {post.totalCost ? (
+                      <span className="group relative cursor-help">
+                        {formatCostDisplay(post.totalCost).primary}
+                        <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{formatCostDisplay(post.totalCost).tooltip}</span>
+                      </span>
+                    ) : '-'}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
-                      <StatusBadge status={post.status} />
+                      <StatusBadge status={post.status} error={post.error} />
                       {post.retryCount ? (
                         <span className="text-[10px] text-slate-500">{t('retryCountLabel', { count: post.retryCount })}</span>
                       ) : null}
@@ -515,7 +541,9 @@ export default function HistoryPage() {
                 )}
                 {selected.totalCost ? (
                   <div className="text-xs text-slate-500">
-                    Cost: <span className="text-emerald-400 font-mono">{formatCostKrw(selected.totalCost)}</span>
+                    Cost: <span className="text-emerald-400 font-mono group relative cursor-help">{formatCostDisplay(selected.totalCost).primary}
+                      <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{formatCostDisplay(selected.totalCost).tooltip}</span>
+                    </span>
                   </div>
                 ) : null}
               </div>

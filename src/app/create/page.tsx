@@ -338,7 +338,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport, mediaType, stylePreset, captionLang, trendPreset }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport, mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
           signal,
         });
       }
@@ -383,7 +383,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl, mediaType, stylePreset, captionLang, trendPreset }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl, mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
           signal,
         });
       }
@@ -451,7 +451,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 3, caption: generatedCaption, hashtags: generatedHashtags, mediaType, stylePreset, captionLang, trendPreset }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 3, caption: generatedCaption, hashtags: generatedHashtags, mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
           signal,
         });
       }
@@ -509,7 +509,7 @@ export default function CreatePage() {
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '', mediaType, stylePreset, captionLang, trendPreset }),
+          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '', mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
           signal,
         });
         setJobId(null);
@@ -605,6 +605,8 @@ export default function CreatePage() {
             stylePreset,
             captionLang,
             trendPreset,
+            totalTokens,
+            totalCost,
           }),
         });
       } else {
@@ -623,6 +625,8 @@ export default function CreatePage() {
             stylePreset,
             captionLang,
             trendPreset,
+            totalTokens,
+            totalCost,
           }),
         });
         const json = await res.json();
@@ -639,7 +643,10 @@ export default function CreatePage() {
       return pipeline[0].status === 'idle' || pipeline[0].status === 'error';
     }
     if (stepIndex === 1) {
-      return pipeline[0].status === 'complete' && (pipeline[1].status === 'idle' || pipeline[1].status === 'error');
+      // Allow manual image generation if prompt exists (skip trend analysis)
+      const hasTrend = pipeline[0].status === 'complete';
+      const hasManualPrompt = prompt.trim().length > 0;
+      return (hasTrend || hasManualPrompt) && (pipeline[1].status === 'idle' || pipeline[1].status === 'error');
     }
     if (stepIndex === 2) {
       return pipeline[1].status === 'complete' && pipeline[2].status !== 'running';
