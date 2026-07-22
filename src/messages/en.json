@@ -82,7 +82,16 @@
     "saved": "Saved",
     "resumeConfirm": "Previous work found. Resume?",
     "resumeYes": "Resume",
-    "resumeNo": "Start New"
+    "resumeNo": "Start New",
+    "imageQuality": "Image Quality",
+    "qualityStandard": "Standard ($0.04/img)",
+    "qualityUltra": "Ultra ($0.08/img)",
+    "estimatedImageCost": "Image est.",
+    "download": "Download",
+    "downloading": "Downloading...",
+    "driveSaving": "Saving to Drive...",
+    "driveSaved": "Saved to Drive",
+    "driveFailed": "Drive save failed"
   },
   "history": {
     "title": "History",
@@ -112,7 +121,9 @@
     "retryCountLabel": "Retry {count}x",
     "errorReason": "Error",
     "totalTokens": "Total Tokens",
-    "totalCost": "Total Cost"
+    "totalCost": "Total Cost",
+    "download": "Download",
+    "downloading": "Downloading..."
   },
   "analytics": {
     "title": "Analytics",
@@ -193,7 +204,15 @@
     "styleVintageFilm": "Vintage Film",
     "styleWatercolor": "Watercolor",
     "style3dRender": "3D Render",
-    "stylePopArt": "Pop Art"
+    "stylePopArt": "Pop Art",
+    "imageQuality": "Image Quality",
+    "imageQualityDesc": "Ultra provides higher resolution and detail (2x cost)",
+    "qualityStandard": "Standard ($0.04/img)",
+    "qualityUltra": "Ultra ($0.08/img)",
+    "googleDriveAutoSave": "Google Drive Auto Save",
+    "googleDriveAutoSaveDesc": "Automatically save generated images/videos to Google Drive",
+    "googleDriveFolderId": "Drive Folder ID",
+    "googleDriveFolderIdPlaceholder": "Enter Google Drive folder ID"
   },
   "common": {
     "loading": "Loading...",

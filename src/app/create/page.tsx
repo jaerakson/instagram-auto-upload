@@ -22,8 +22,10 @@ import {
   Film,
   Square,
   Save,
+  Download,
 } from 'lucide-react';
-import type { CaptionLanguage, MediaType, StylePreset, TrendPreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import type { CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import { IMAGE_QUALITY_COSTS } from '@/types';
 import { cn } from '@/lib/utils';
 
 const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
@@ -102,6 +104,10 @@ export default function CreatePage() {
   const [savedProgress, setSavedProgress] = useState(false);
   const [pendingJob, setPendingJob] = useState<any>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>('standard');
+  const [driveAutoSave, setDriveAutoSave] = useState(false);
+  const [driveFolderId, setDriveFolderId] = useState('');
+  const [driveSaveStatus, setDriveSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   useEffect(() => {
     // Fetch USD→KRW exchange rate
@@ -123,6 +129,9 @@ export default function CreatePage() {
           if (s.stylePreset) setStylePreset(s.stylePreset);
           if (s.trendPreset) setTrendPreset(s.trendPreset);
           if (s.captionLanguage) setCaptionLang(s.captionLanguage);
+          if (s.imageQuality) setImageQuality(s.imageQuality);
+          if (s.googleDriveAutoSave) setDriveAutoSave(true);
+          if (s.googleDriveFolderId) setDriveFolderId(s.googleDriveFolderId);
         }
       } catch { /* ignore */ }
 
@@ -347,19 +356,20 @@ export default function CreatePage() {
           prompt: generatedPrompt.trim(),
           aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
           type: mediaType,
+          quality: imageQuality,
         }),
         signal,
       });
       const imgJson = await imgRes.json();
       if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
-      const imageCost = mediaType === 'reels' ? 2.80 : 0.02; // Veo ~$2.80/8s, Imagen ~$0.02
+      const imageCost = mediaType === 'reels' ? 2.80 : IMAGE_QUALITY_COSTS[imageQuality];
       runCost += imageCost;
       setTotalCost(runCost);
       const imageResult: ImageResult = {
         imageUrl: imgJson.data.imageUrl || imgJson.data.videoUrl || '',
         prompt: generatedPrompt.trim(),
         designIntent: generatedStyle || '',
-        model: mediaType === 'reels' ? 'veo-3.1-generate-preview' : 'imagen-4.0-generate-001',
+        model: mediaType === 'reels' ? 'veo-3.1-generate-preview' : (imageQuality === 'ultra' ? 'imagen-4.0-ultra-generate-001' : 'imagen-4.0-generate-001'),
         imageSize: mediaType === 'reels' ? '9:16' : '1:1',
         mediaType,
       };
@@ -376,6 +386,21 @@ export default function CreatePage() {
           body: JSON.stringify({ id: currentJobId, currentStep: 2, imageUrl: imageResult.imageUrl, mediaType, stylePreset, captionLang, trendPreset }),
           signal,
         });
+      }
+
+      // Google Drive auto-save (background, non-blocking)
+      if (driveAutoSave && driveFolderId && imageResult.imageUrl) {
+        setDriveSaveStatus('saving');
+        const ext = mediaType === 'reels' ? 'mp4' : 'png';
+        const driveFilename = `insta-${new Date().toISOString().slice(0, 10)}-${stylePreset}.${ext}`;
+        fetch('/api/drive/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl: imageResult.imageUrl, filename: driveFilename, folderId: driveFolderId }),
+        })
+          .then(r => r.json())
+          .then(j => setDriveSaveStatus(j.success ? 'saved' : 'failed'))
+          .catch(() => setDriveSaveStatus('failed'));
       }
 
       // Step 3: Caption generation
@@ -659,6 +684,7 @@ export default function CreatePage() {
               prompt: prompt.trim(),
               aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
               type: mediaType,
+              quality: imageQuality,
             }),
           });
           const json = await res.json();
@@ -667,7 +693,7 @@ export default function CreatePage() {
             imageUrl: json.data.imageUrl || json.data.videoUrl || '',
             prompt: prompt.trim(),
             designIntent: style || '',
-            model: mediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+            model: mediaType === 'reels' ? 'veo-2.0-generate-001' : (imageQuality === 'ultra' ? 'imagen-4.0-ultra-generate-001' : 'imagen-4.0-generate-001'),
             imageSize: mediaType === 'reels' ? '9:16' : '1:1',
             mediaType,
           };
@@ -844,6 +870,17 @@ export default function CreatePage() {
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('imageQuality')}</label>
+          <select
+            value={imageQuality}
+            onChange={(e) => setImageQuality(e.target.value as ImageQuality)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            <option value="standard">{t('qualityStandard')}</option>
+            <option value="ultra">{t('qualityUltra')}</option>
+          </select>
+        </div>
         {autoAllRunning ? (
           <Button
             size="lg"
@@ -900,6 +937,15 @@ export default function CreatePage() {
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
               <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
+              <span>{t('estimatedImageCost')}: <span className="text-blue-400 font-mono">${mediaType === 'reels' ? '2.80' : IMAGE_QUALITY_COSTS[imageQuality].toFixed(2)}</span></span>
+              {driveSaveStatus !== 'idle' && (
+                <span className={cn(
+                  'font-medium',
+                  driveSaveStatus === 'saving' && 'text-blue-400',
+                  driveSaveStatus === 'saved' && 'text-emerald-400',
+                  driveSaveStatus === 'failed' && 'text-red-400',
+                )}>{t(driveSaveStatus === 'saving' ? 'driveSaving' : driveSaveStatus === 'saved' ? 'driveSaved' : 'driveFailed')}</span>
+              )}
             </div>
           )}
         </div>
@@ -1151,27 +1197,63 @@ function TrendResultView({ result }: { result: TrendResult }) {
 
 function ImageResultView({ result }: { result: ImageResult }) {
   const t = useTranslations('create');
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!result.imageUrl) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(result.imageUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const ext = result.mediaType === 'reels' || result.imageUrl.includes('.mp4') ? 'mp4' : 'png';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `insta-${new Date().toISOString().slice(0, 10)}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+    finally { setDownloading(false); }
+  }
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
-      <div className="shrink-0 overflow-hidden rounded-xl border border-slate-700">
-        {result.mediaType === 'reels' || result.imageUrl?.includes('.mp4') ? (
-          <video
-            src={result.imageUrl}
-            controls
-            autoPlay
-            loop
-            playsInline
-            className="h-64 w-auto max-w-xs object-cover"
-          />
-        ) : (
-          <img
-            src={result.imageUrl}
-            alt="Generated"
-            className="h-64 w-64 object-cover"
-            width={256}
-            height={256}
-          />
-        )}
+      <div className="shrink-0">
+        <div className="overflow-hidden rounded-xl border border-slate-700">
+          {result.mediaType === 'reels' || result.imageUrl?.includes('.mp4') ? (
+            <video
+              src={result.imageUrl}
+              controls
+              autoPlay
+              loop
+              playsInline
+              className="h-64 w-auto max-w-xs object-cover"
+            />
+          ) : (
+            <img
+              src={result.imageUrl}
+              alt="Generated"
+              className="h-64 w-64 object-cover"
+              width={256}
+              height={256}
+            />
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="mt-2 w-full border-slate-700 text-slate-300 hover:bg-slate-800"
+        >
+          {downloading ? (
+            <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('downloading')}</>
+          ) : (
+            <><Download className="mr-1.5 h-3.5 w-3.5" />{t('download')}</>
+          )}
+        </Button>
       </div>
       <div className="space-y-2 text-sm">
         <div>

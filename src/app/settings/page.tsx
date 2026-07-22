@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle, RotateCcw } from 'lucide-react';
-import type { AppSettings, CaptionLanguage, MediaType, StylePreset, TrendPreset, CredentialKey, CredentialStatus } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT } from '@/types';
+import type { AppSettings, CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, CredentialKey, CredentialStatus } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT, IMAGE_QUALITY_COSTS } from '@/types';
 
 const TREND_PRESET_OPTIONS: { value: TrendPreset; labelKey: string }[] = [
   { value: 'portrait', labelKey: 'trendPortrait' },
@@ -59,6 +59,9 @@ const defaultSettings: AppSettings = {
   mediaType: 'image' as const,
   stylePreset: 'photorealistic' as const,
   stylePrompts: { ...DEFAULT_STYLE_PROMPTS },
+  imageQuality: 'standard' as const,
+  googleDriveAutoSave: false,
+  googleDriveFolderId: '',
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -316,6 +319,51 @@ export default function SettingsPage() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">{t('mediaTypeDesc')}</p>
+            </CardContent>
+          </Card>
+
+          {/* Image Quality */}
+          <Card className="border-slate-800 bg-slate-900">
+            <CardContent className="p-5">
+              <Label className="mb-3 block text-sm text-white">
+                {t('imageQuality')}
+              </Label>
+              <select
+                value={settings.imageQuality}
+                onChange={(e) => update('imageQuality', e.target.value as ImageQuality)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="standard">{t('qualityStandard')}</option>
+                <option value="ultra">{t('qualityUltra')}</option>
+              </select>
+              <p className="mt-2 text-xs text-slate-500">{t('imageQualityDesc')}</p>
+            </CardContent>
+          </Card>
+
+          {/* Google Drive Auto Save */}
+          <Card className={cn("border-slate-800 bg-slate-900", settings.googleDriveAutoSave && "border-blue-500/50")}>
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-white">{t('googleDriveAutoSave')}</p>
+                  <p className="text-xs text-slate-400">{t('googleDriveAutoSaveDesc')}</p>
+                </div>
+                <Switch
+                  checked={settings.googleDriveAutoSave}
+                  onCheckedChange={(checked) => update('googleDriveAutoSave', checked)}
+                />
+              </div>
+              {settings.googleDriveAutoSave && (
+                <div>
+                  <Label className="mb-1.5 block text-xs text-slate-500">{t('googleDriveFolderId')}</Label>
+                  <Input
+                    value={settings.googleDriveFolderId}
+                    onChange={(e) => update('googleDriveFolderId', e.target.value)}
+                    placeholder={t('googleDriveFolderIdPlaceholder')}
+                    className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

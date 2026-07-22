@@ -15,7 +15,10 @@ export class GoogleSheetsService {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}');
     const auth = new google.auth.GoogleAuth({
       credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file',
+      ],
     });
     this.sheets = google.sheets({ version: 'v4', auth });
     this.spreadsheetId = process.env.GOOGLE_SHEETS_ID || '';
@@ -278,6 +281,9 @@ export class GoogleSheetsService {
       mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
       stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
       stylePrompts,
+      imageQuality: (settingsMap.get('imageQuality') || 'standard') as AppSettings['imageQuality'],
+      googleDriveAutoSave: toBool(settingsMap.get('googleDriveAutoSave')),
+      googleDriveFolderId: settingsMap.get('googleDriveFolderId') || '',
       instagramConnected: toBool(settingsMap.get('instagramConnected')),
       googleSheetsConnected: toBool(settingsMap.get('googleSheetsConnected')),
       geminiConnected: toBool(settingsMap.get('geminiConnected')),
@@ -298,6 +304,9 @@ export class GoogleSheetsService {
       ['generatePrompt', merged.generatePrompt || DEFAULT_GENERATE_PROMPT],
       ['mediaType', merged.mediaType || 'image'],
       ['stylePreset', merged.stylePreset || 'photorealistic'],
+      ['imageQuality', merged.imageQuality || 'standard'],
+      ['googleDriveAutoSave', String(merged.googleDriveAutoSave ?? false)],
+      ['googleDriveFolderId', merged.googleDriveFolderId || ''],
       ['instagramConnected', String(merged.instagramConnected)],
       ['googleSheetsConnected', String(merged.googleSheetsConnected)],
       ['geminiConnected', String(merged.geminiConnected)],

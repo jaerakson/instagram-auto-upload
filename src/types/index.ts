@@ -38,6 +38,12 @@ export type CaptionLanguage = 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
 export type MediaType = 'image' | 'reels';
 export type StylePreset = 'photorealistic' | 'anime' | 'ghibli' | 'vintage_film' | 'watercolor' | '3d_render' | 'pop_art';
 export type TrendPreset = 'portrait' | 'anime' | 'dark_mood' | 'minimal' | 'trend_tracking';
+export type ImageQuality = 'standard' | 'ultra';
+
+export const IMAGE_QUALITY_COSTS: Record<ImageQuality, number> = {
+  standard: 0.04,
+  ultra: 0.08,
+};
 
 export interface AppSettings {
   autoMode: boolean;
@@ -52,6 +58,9 @@ export interface AppSettings {
   mediaType: MediaType;
   stylePreset: StylePreset;
   stylePrompts: Record<string, string>; // 스타일별 프롬프트 (시트 커스텀)
+  imageQuality: ImageQuality;
+  googleDriveAutoSave: boolean;
+  googleDriveFolderId: string;
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;

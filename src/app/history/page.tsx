@@ -22,7 +22,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { ImageIcon, Loader2, Search, X, RotateCcw, ArrowUpDown } from 'lucide-react';
+import { ImageIcon, Loader2, Search, X, RotateCcw, ArrowUpDown, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PostRecord, PerformanceRecord } from '@/types';
 
@@ -57,6 +57,7 @@ export default function HistoryPage() {
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [downloadingDetail, setDownloadingDetail] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -448,16 +449,49 @@ export default function HistoryPage() {
                     />
                   )
                 )}
-                {selected.mediaUrl && (
-                  <a
-                    href={selected.mediaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                  >
-                    Instagram에서 보기 →
-                  </a>
-                )}
+                <div className="flex items-center gap-3">
+                  {selected.imageUrl && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={downloadingDetail}
+                      onClick={async () => {
+                        setDownloadingDetail(true);
+                        try {
+                          const res = await fetch(selected.imageUrl);
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const ext = selected.imageUrl.includes('.mp4') ? 'mp4' : 'png';
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `insta-${new Date(selected.date).toISOString().slice(0, 10)}.${ext}`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        } catch { /* ignore */ }
+                        finally { setDownloadingDetail(false); }
+                      }}
+                      className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                    >
+                      {downloadingDetail ? (
+                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('downloading')}</>
+                      ) : (
+                        <><Download className="mr-1.5 h-3.5 w-3.5" />{t('download')}</>
+                      )}
+                    </Button>
+                  )}
+                  {selected.mediaUrl && (
+                    <a
+                      href={selected.mediaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      Instagram에서 보기 →
+                    </a>
+                  )}
+                </div>
                 <div>
                   <p className="mb-1 text-xs font-medium text-slate-500">{t('fullCaption')}</p>
                   <p className="text-sm text-slate-300 whitespace-pre-wrap">

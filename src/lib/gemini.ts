@@ -199,9 +199,11 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     options?: {
       aspectRatio?: string;
       sampleCount?: number;
+      quality?: 'standard' | 'ultra';
     },
   ): Promise<{ imageUrl: string }> {
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict';
+    const model = options?.quality === 'ultra' ? 'imagen-4.0-ultra-generate-001' : 'imagen-4.0-generate-001';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
 
     const res = await fetch(endpoint, {
       method: 'POST',

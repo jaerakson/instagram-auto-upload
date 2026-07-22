@@ -82,7 +82,16 @@
     "saved": "저장됨",
     "resumeConfirm": "이전 작업이 있습니다. 이어하시겠습니까?",
     "resumeYes": "이어하기",
-    "resumeNo": "새로 시작"
+    "resumeNo": "새로 시작",
+    "imageQuality": "이미지 품질",
+    "qualityStandard": "Standard ($0.04/장)",
+    "qualityUltra": "Ultra ($0.08/장)",
+    "estimatedImageCost": "이미지 예상",
+    "download": "다운로드",
+    "downloading": "다운로드 중...",
+    "driveSaving": "Drive 저장 중...",
+    "driveSaved": "Drive 저장됨",
+    "driveFailed": "Drive 저장 실패"
   },
   "history": {
     "title": "작업 내역",
@@ -112,7 +121,9 @@
     "retryCountLabel": "재시도 {count}회",
     "errorReason": "실패 사유",
     "totalTokens": "총 Tokens",
-    "totalCost": "총 비용"
+    "totalCost": "총 비용",
+    "download": "다운로드",
+    "downloading": "다운로드 중..."
   },
   "analytics": {
     "title": "성과 분석",
@@ -193,7 +204,15 @@
     "styleVintageFilm": "빈티지 필름",
     "styleWatercolor": "수채화",
     "style3dRender": "3D 렌더",
-    "stylePopArt": "팝아트"
+    "stylePopArt": "팝아트",
+    "imageQuality": "이미지 품질",
+    "imageQualityDesc": "Ultra는 더 높은 해상도와 디테일을 제공합니다 (2배 비용)",
+    "qualityStandard": "Standard ($0.04/장)",
+    "qualityUltra": "Ultra ($0.08/장)",
+    "googleDriveAutoSave": "Google Drive 자동 저장",
+    "googleDriveAutoSaveDesc": "이미지/동영상 생성 시 Google Drive에 자동으로 저장합니다",
+    "googleDriveFolderId": "Drive 폴더 ID",
+    "googleDriveFolderIdPlaceholder": "Google Drive 폴더 ID를 입력하세요"
   },
   "common": {
     "loading": "로딩 중...",

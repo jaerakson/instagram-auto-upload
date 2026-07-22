@@ -4,7 +4,7 @@ import type { ApiResponse } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const { prompt, aspectRatio, type } = await request.json();
+    const { prompt, aspectRatio, type, quality } = await request.json();
     if (!prompt) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'prompt는 필수입니다.' },
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     } else {
       const result = await geminiService.generateImage(prompt, {
         aspectRatio: aspectRatio || '1:1',
+        quality: quality || 'standard',
       });
       return NextResponse.json<ApiResponse<{ imageUrl: string; type: string }>>({
         success: true,
