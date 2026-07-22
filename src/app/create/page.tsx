@@ -213,6 +213,10 @@ export default function CreatePage() {
       setStyle(json.data.style);
       if (json.data.trendReport) setTrendReport(json.data.trendReport);
 
+      // Track cost from trend analysis
+      if (json.data.totalTokens) setTotalTokens(prev => prev + json.data.totalTokens);
+      if (json.data.totalCost) setTotalCost(prev => prev + json.data.totalCost);
+
       // Auto-complete trend step so image button becomes active
       const trendResult: TrendResult = {
         summary: json.data.trendReport || `Style: ${json.data.style}`,
@@ -260,6 +264,10 @@ export default function CreatePage() {
       if (mode === 'full' || mode === 'hashtags_only') {
         setEditHashtags(json.data.hashtags);
       }
+
+      // Track cost from caption generation
+      if (json.data.totalTokens) setTotalTokens(prev => prev + json.data.totalTokens);
+      if (json.data.totalCost) setTotalCost(prev => prev + json.data.totalCost);
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Failed to generate caption');
     } finally {
@@ -696,6 +704,11 @@ export default function CreatePage() {
           });
           const json = await res.json();
           if (!json.success) throw new Error(json.error || 'Image generation failed');
+
+          // Track image generation cost
+          const imageCost = mediaType === 'reels' ? 2.80 : IMAGE_QUALITY_COSTS[imageQuality];
+          setTotalCost(prev => prev + imageCost);
+
           const imageResult: ImageResult = {
             imageUrl: json.data.imageUrl || json.data.videoUrl || '',
             prompt: prompt.trim(),
@@ -709,6 +722,22 @@ export default function CreatePage() {
             next[1] = { step: 'image', status: 'complete', result: imageResult };
             return next;
           });
+
+          // Google Drive auto-save (background, non-blocking)
+          if (driveAutoSave && driveFolderId && imageResult.imageUrl) {
+            setDriveSaveStatus('saving');
+            const ext = mediaType === 'reels' ? 'mp4' : 'png';
+            const driveFilename = `insta-${new Date().toISOString().slice(0, 10)}-${stylePreset}.${ext}`;
+            fetch('/api/drive/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileUrl: imageResult.imageUrl, filename: driveFilename, folderId: driveFolderId }),
+            })
+              .then(r => r.json())
+              .then(j => setDriveSaveStatus(j.success ? 'saved' : 'failed'))
+              .catch(() => setDriveSaveStatus('failed'));
+          }
+
           break;
         }
         case 'caption': {
@@ -924,7 +953,7 @@ export default function CreatePage() {
       </div>
 
       {/* Progress Bar + Cost */}
-      {(autoAllRunning || totalTokens > 0) && (
+      {(autoAllRunning || totalTokens > 0 || totalCost > 0) && (
         <div className="space-y-2">
           {autoAllRunning && (
             <>
@@ -940,7 +969,7 @@ export default function CreatePage() {
               </div>
             </>
           )}
-          {totalTokens > 0 && (
+          {(totalTokens > 0 || totalCost > 0) && (
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
               <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
