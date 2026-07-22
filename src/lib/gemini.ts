@@ -1,11 +1,21 @@
 import { put, list, del } from '@vercel/blob';
-import type { TrendResult, PerformanceRecord } from '@/types';
+import type { TrendResult, PerformanceRecord, UsageInfo } from '@/types';
 
 export class GeminiService {
   private apiKey: string;
 
   constructor(config: { apiKey: string }) {
     this.apiKey = config.apiKey;
+  }
+
+  // Gemini 2.5 Flash 비용: 입력 $0.15/1M, 출력 $0.60/1M
+  private extractUsage(data: Record<string, unknown>): UsageInfo {
+    const meta = data.usageMetadata as Record<string, number> | undefined;
+    const inputTokens = meta?.promptTokenCount ?? 0;
+    const outputTokens = meta?.candidatesTokenCount ?? 0;
+    const totalTokens = meta?.totalTokenCount ?? (inputTokens + outputTokens);
+    const cost = (inputTokens * 0.15 + outputTokens * 0.60) / 1_000_000;
+    return { inputTokens, outputTokens, totalTokens, cost };
   }
 
   private parseGeminiJson<T>(text: string): T {
@@ -42,7 +52,7 @@ export class GeminiService {
     return repaired;
   }
 
-  async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string, trendPromptOverride?: string): Promise<TrendResult> {
+  async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string, trendPromptOverride?: string): Promise<TrendResult & { usage?: UsageInfo }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let performanceSection = '';
@@ -94,11 +104,12 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       throw new Error('No response from Gemini');
     }
 
+    const usage = this.extractUsage(data);
     const parsed = this.parseGeminiJson<TrendResult>(text);
     if (!parsed.summary || !parsed.topStyles || !parsed.keywords) {
       throw new Error('Gemini trend response missing required fields');
     }
-    return parsed;
+    return { ...parsed, usage };
   }
 
   async generatePrompt(
@@ -106,7 +117,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     stylePreset?: string,
     stylePromptOverride?: string,
     generatePromptOverride?: string,
-  ): Promise<{ prompt: string; style: string; trendReport: string }> {
+  ): Promise<{ prompt: string; style: string; trendReport: string; usage?: UsageInfo }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let trendSection = '';
@@ -170,6 +181,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       throw new Error('No response from Gemini');
     }
 
+    const usage = this.extractUsage(data);
     const parsed = this.parseGeminiJson<{ prompt: string; style?: string }>(text);
     if (!parsed.prompt) {
       throw new Error('Gemini response missing prompt field');
@@ -178,6 +190,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       prompt: parsed.prompt,
       style: parsed.style || trendContext?.topStyles?.slice(0, 3).join(', ') || 'cinematic, editorial, dreamy',
       trendReport: trendContext?.summary ?? '',
+      usage,
     };
   }
 
@@ -342,9 +355,9 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     prompt: string;
     style: string;
     language: 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
-    trendContext?: TrendResult;
+    trendContext?: TrendResult & { usage?: UsageInfo };
     mode: 'full' | 'caption_only' | 'hashtags_only';
-  }): Promise<{ caption: string; hashtags: string }> {
+  }): Promise<{ caption: string; hashtags: string; usage?: UsageInfo }> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     const languageToneMap: Record<string, string> = {
@@ -430,12 +443,14 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     }
 
     const parsed = this.parseGeminiJson<{ caption: string; hashtags: string }>(text);
+    const usage = this.extractUsage(data);
     if (options.mode === 'full' && (!parsed.caption || !parsed.hashtags)) {
       throw new Error('Gemini caption response missing required fields');
     }
     return {
       caption: parsed.caption || '',
       hashtags: parsed.hashtags || '',
+      usage,
     };
   }
 
@@ -525,7 +540,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
   async generateCaptionWithRetry(
     options: Parameters<GeminiService['generateCaption']>[0],
     maxRetries = 5,
-  ): Promise<{ caption: string; hashtags: string }> {
+  ): Promise<{ caption: string; hashtags: string; usage?: UsageInfo }> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const result = await this.generateCaption(options);
       if (this.validateCaptionLanguage(result.caption, result.hashtags, options.language)) {

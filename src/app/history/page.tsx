@@ -95,9 +95,20 @@ export default function HistoryPage() {
     );
   }
 
+  const totalTokensSum = posts.reduce((sum, p) => sum + (p.totalTokens || 0), 0);
+  const totalCostSum = posts.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        {totalTokensSum > 0 && (
+          <div className="flex items-center gap-4 text-xs text-slate-500">
+            <span>총 Tokens: <span className="text-slate-300 font-mono">{totalTokensSum.toLocaleString()}</span></span>
+            <span>총 비용: <span className="text-emerald-400 font-mono">${totalCostSum.toFixed(4)}</span></span>
+          </div>
+        )}
+      </div>
 
       <Card className="border-slate-800 bg-slate-900 overflow-hidden">
         <Table>
@@ -108,6 +119,7 @@ export default function HistoryPage() {
               <TableHead className="text-slate-400 text-right">{t('date')}</TableHead>
               <TableHead className="text-slate-400 text-right">{t('likes')}</TableHead>
               <TableHead className="text-slate-400 text-right">{t('comments')}</TableHead>
+              <TableHead className="text-slate-400 text-right">Cost</TableHead>
               <TableHead className="text-slate-400 text-center">{t('status')}</TableHead>
               <TableHead className="text-slate-400 text-center">Link</TableHead>
             </TableRow>
@@ -162,6 +174,9 @@ export default function HistoryPage() {
                   </TableCell>
                   <TableCell className="text-right text-sm text-slate-300">
                     {perf?.comments ?? '-'}
+                  </TableCell>
+                  <TableCell className="text-right text-xs font-mono text-emerald-400">
+                    {post.totalCost ? `$${post.totalCost.toFixed(4)}` : '-'}
                   </TableCell>
                   <TableCell className="text-center">
                     <StatusBadge status={post.status} />

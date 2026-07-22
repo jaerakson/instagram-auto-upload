@@ -40,9 +40,9 @@ export async function POST(request: Request) {
       mode: captionMode,
     });
 
-    return NextResponse.json<ApiResponse<{ caption: string; hashtags: string }>>({
+    return NextResponse.json<ApiResponse<{ caption: string; hashtags: string; totalTokens: number; totalCost: number }>>({
       success: true,
-      data: result,
+      data: { caption: result.caption, hashtags: result.hashtags, totalTokens: result.usage?.totalTokens ?? 0, totalCost: result.usage?.cost ?? 0 },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

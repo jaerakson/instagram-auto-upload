@@ -26,7 +26,7 @@ export class GoogleSheetsService {
   async getPosts(): Promise<PostRecord[]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A2:P`,
+      range: `${SHEET_POSTS}!A2:R`,
     });
     const rows = res.data.values || [];
     return rows.map((row) => ({
@@ -46,13 +46,15 @@ export class GoogleSheetsService {
       stylePreset: row[13] || undefined,
       captionLang: row[14] || undefined,
       trendPreset: row[15] || undefined,
+      totalTokens: row[16] ? Number(row[16]) : undefined,
+      totalCost: row[17] ? Number(row[17]) : undefined,
     }));
   }
 
   async addPost(post: PostRecord): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A:P`,
+      range: `${SHEET_POSTS}!A:R`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -72,6 +74,8 @@ export class GoogleSheetsService {
           post.stylePreset ?? '',
           post.captionLang ?? '',
           post.trendPreset ?? '',
+          post.totalTokens ?? '',
+          post.totalCost ?? '',
         ]],
       },
     });
@@ -91,7 +95,7 @@ export class GoogleSheetsService {
     const rowNumber = rowIndex + 2; // 1-indexed + header row
     const currentRow = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:P${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:R${rowNumber}`,
     });
     const current = currentRow.data.values?.[0] || [];
 
@@ -112,11 +116,13 @@ export class GoogleSheetsService {
       updates.stylePreset ?? current[13] ?? '',
       updates.captionLang ?? current[14] ?? '',
       updates.trendPreset ?? current[15] ?? '',
+      updates.totalTokens ?? current[16] ?? '',
+      updates.totalCost ?? current[17] ?? '',
     ];
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A${rowNumber}:P${rowNumber}`,
+      range: `${SHEET_POSTS}!A${rowNumber}:R${rowNumber}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [merged] },
     });

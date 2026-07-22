@@ -94,6 +94,8 @@ export default function CreatePage() {
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [stylePreset, setStylePreset] = useState<StylePreset>('photorealistic');
   const [trendPreset, setTrendPreset] = useState<TrendPreset>('portrait');
+  const [totalTokens, setTotalTokens] = useState(0);
+  const [totalCost, setTotalCost] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
@@ -141,6 +143,8 @@ export default function CreatePage() {
     setErrorMsg('');
     setAutoProgress(0);
     setAutoStepLabel('');
+    setTotalTokens(0);
+    setTotalCost(0);
     setJobId(null);
   }
 
@@ -275,6 +279,10 @@ export default function CreatePage() {
       const generatedPrompt = promptJson.data.prompt;
       const generatedStyle = promptJson.data.style;
       const generatedTrendReport = promptJson.data.trendReport || '';
+      let runTokens = promptJson.data.totalTokens || 0;
+      let runCost = promptJson.data.totalCost || 0;
+      setTotalTokens(runTokens);
+      setTotalCost(runCost);
 
       setPrompt(generatedPrompt);
       setStyle(generatedStyle);
@@ -323,11 +331,14 @@ export default function CreatePage() {
       });
       const imgJson = await imgRes.json();
       if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
+      const imageCost = mediaType === 'reels' ? 2.80 : 0.02; // Veo ~$2.80/8s, Imagen ~$0.02
+      runCost += imageCost;
+      setTotalCost(runCost);
       const imageResult: ImageResult = {
         imageUrl: imgJson.data.imageUrl || imgJson.data.videoUrl || '',
         prompt: generatedPrompt.trim(),
         designIntent: generatedStyle || '',
-        model: mediaType === 'reels' ? 'veo-2.0-generate-001' : 'imagen-4.0-generate-001',
+        model: mediaType === 'reels' ? 'veo-3.1-generate-preview' : 'imagen-4.0-generate-001',
         imageSize: mediaType === 'reels' ? '9:16' : '1:1',
         mediaType,
       };
@@ -368,6 +379,10 @@ export default function CreatePage() {
       const capJson = await capRes.json();
       if (!capJson.success) throw new Error(capJson.error || 'Caption generation failed');
 
+      runTokens += capJson.data.totalTokens || 0;
+      runCost += capJson.data.totalCost || 0;
+      setTotalTokens(runTokens);
+      setTotalCost(runCost);
       const generatedCaption = capJson.data.caption;
       const generatedHashtags = capJson.data.hashtags;
       setEditCaption(generatedCaption);
@@ -439,6 +454,8 @@ export default function CreatePage() {
           status: 'published',
           trendReport: generatedTrendReport,
           style: generatedStyle || '',
+          totalTokens: runTokens,
+          totalCost: runCost,
         }),
         signal,
       });
@@ -832,19 +849,29 @@ export default function CreatePage() {
         </Button>
       </div>
 
-      {/* Progress Bar */}
-      {autoAllRunning && (
+      {/* Progress Bar + Cost */}
+      {(autoAllRunning || totalTokens > 0) && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400">{autoStepLabel}</span>
-            <span className="text-slate-500">{autoProgress}%</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 transition-all duration-700 ease-out"
-              style={{ width: `${autoProgress}%` }}
-            />
-          </div>
+          {autoAllRunning && (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">{autoStepLabel}</span>
+                <span className="text-slate-500">{autoProgress}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 transition-all duration-700 ease-out"
+                  style={{ width: `${autoProgress}%` }}
+                />
+              </div>
+            </>
+          )}
+          {totalTokens > 0 && (
+            <div className="flex items-center gap-4 text-xs text-slate-500">
+              <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
+              <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}</span></span>
+            </div>
+          )}
         </div>
       )}
 

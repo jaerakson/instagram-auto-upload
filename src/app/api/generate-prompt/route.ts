@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getGeminiService } from '@/lib/services';
 import { sheetsService } from '@/lib/google-sheets';
-import type { ApiResponse, TrendResult, PerformanceRecord } from '@/types';
+import type { ApiResponse, PerformanceRecord } from '@/types';
 import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
 
 export async function POST(request: Request) {
@@ -49,12 +49,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const trendResult: TrendResult = await geminiService.analyzeTrends(performanceData, trendKeywords, trendPromptOverride);
+    const trendResult = await geminiService.analyzeTrends(performanceData, trendKeywords, trendPromptOverride);
     const result = await geminiService.generatePrompt(trendResult, stylePreset, stylePromptOverride, generatePromptOverride);
 
-    return NextResponse.json<ApiResponse<{ prompt: string; style: string; trendReport: string }>>({
+    // 트렌드 + 프롬프트 생성 토큰 합산
+    const totalTokens = (trendResult.usage?.totalTokens ?? 0) + (result.usage?.totalTokens ?? 0);
+    const totalCost = (trendResult.usage?.cost ?? 0) + (result.usage?.cost ?? 0);
+
+    return NextResponse.json<ApiResponse<{ prompt: string; style: string; trendReport: string; totalTokens: number; totalCost: number }>>({
       success: true,
-      data: result,
+      data: { prompt: result.prompt, style: result.style, trendReport: result.trendReport, totalTokens, totalCost },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

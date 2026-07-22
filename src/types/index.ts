@@ -16,6 +16,8 @@ export interface PostRecord {
   stylePreset?: string;        // style preset used
   captionLang?: string;        // caption language used
   trendPreset?: string;        // trend preset used
+  totalTokens?: number;        // 총 토큰 사용량
+  totalCost?: number;          // 총 비용 (USD)
 }
 
 // Google Sheets "성과" 시트 행
@@ -86,6 +88,14 @@ Rules:
 - The style field should be 2-4 comma-separated keywords
 - For VIDEO/Reels prompts: Always end the prompt with an audio description — background music genre + ambient sounds + optional short Korean dialogue in quotes. Example: "...with soft lo-fi piano music, gentle rain sounds, she whispers '비가 참 좋다'"`;
 
+
+// 토큰 사용량 + 비용
+export interface UsageInfo {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost: number;              // USD
+}
 
 // 파이프라인 실행 상태
 export interface PipelineStep {
