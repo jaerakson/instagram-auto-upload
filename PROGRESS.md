@@ -1,3 +1,34 @@
+## 2026-07-22 07:00 (집) — v3.2: 실패 tooltip + 수동 이미지 + 단계별 비용 + 비용 표시 개선
+- 브랜치: main
+- 완료:
+  - **실패 tooltip**: 작업내역 "실패" 배지 hover → 실패 사유 tooltip 표시
+  - **수동 이미지 생성**: 트렌드 분석(Step 1) 없이 프롬프트 직접 입력 → 이미지 생성 가능
+  - **단계별 비용 기록**: pipeline job PUT 6곳 + handleSaveProgress에 totalTokens/totalCost 포함
+    - 중간 중단 시에도 발생 비용이 시트에 저장 → 작업내역에 표시됨
+  - **비용 표시 개선**: locale 기반 통화 (ko: 원화, en: 달러) + hover tooltip (달러/원화 양쪽)
+- 현재 상태: **v3.2 완성. 빌드 정상.**
+- 다음 할 일:
+  - 모바일 반응형 개선
+  - 성과 분석 페이지 동영상/이미지 비교 분석
+- 관련 커밋: 2dbe143
+- 푸시 여부: origin/main 에 푸시 완료
+
+## 2026-07-22 06:00 (집) — v3.1: 이미지 다운로드 + 품질 선택 + Google Drive 자동 저장
+- 브랜치: main
+- 완료:
+  - **이미지 품질 선택**: Standard ($0.04) / Ultra ($0.08) 모델 티어 분기
+    - 설정 + 게시물 생성 페이지에 품질 select 추가
+    - Gemini API: imagen-4.0-generate-001 vs imagen-4.0-ultra-generate-001
+  - **브라우저 다운로드**: fetch→blob→download 패턴, 게시물 생성 + 작업내역 상세에 다운로드 버튼
+  - **Google Drive 자동 저장**: google-drive.ts + /api/drive/upload 신규
+    - 설정: Drive 자동저장 토글 + 폴더 ID 입력
+    - 이미지 생성 후 백그라운드 Drive 업로드 + 상태 표시
+  - AppSettings 확장: imageQuality, googleDriveAutoSave, googleDriveFolderId
+- 현재 상태: **v3.1 완성. 빌드 정상.**
+- 다음 할 일: 실패 tooltip, 수동 이미지 생성, 단계별 비용, 비용 표시 개선
+- 관련 커밋: 0cd549e
+- 푸시 여부: origin/main 에 푸시 완료
+
 ## 2026-07-22 05:00 (집) — v3.0: 비용 원화 표시 + 작업관리 시스템 개선
 - 브랜치: main
 - 완료:
