@@ -1,3 +1,18 @@
+## 2026-07-22 03:00 (집) — fix: 이어하기 설정 전체 복원 누락 수정
+- 브랜치: main
+- 완료:
+  - **자동생성 중간 저장 PUT 6곳** 모두에 `mediaType`, `stylePreset`, `captionLang`, `trendPreset` 추가
+  - 최초 작업 POST에도 `trendPreset` 추가
+  - `PostRecord` 타입에 `trendPreset` 필드 추가, Google Sheets P열 연동
+  - `handleResume()`에서 `trendPreset` 복원 추가
+  - 원인: 중간 단계 PUT에서 설정값을 보내지 않아, 중간에 멈추면 시트에서 빈 값으로 남음 → 이어하기 시 기본값(image)으로 복원되어 동영상이 이미지로 업로드됨
+- 현재 상태: **수정 완료. 빌드 정상.**
+- 다음 할 일:
+  - 모바일 반응형 개선
+  - 성과 분석 페이지 동영상/이미지 비교 분석
+- 관련 커밋: ea0662c, c82a127, 10c442d
+- 푸시 여부: origin/main 에 푸시 완료
+
 ## 2026-07-22 02:00 (집) — v2.7: 게시물 생성 프롬프트 커스텀 편집
 - 브랜치: main
 - 완료:
