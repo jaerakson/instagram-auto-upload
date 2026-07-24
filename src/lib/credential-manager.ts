@@ -6,6 +6,7 @@ export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GE
 export interface CredentialStatus {
   key: CredentialKey;
   configured: boolean;
+  preview?: string;
   updatedAt?: string;
 }
 
@@ -57,12 +58,23 @@ export async function deleteCredential(key: CredentialKey): Promise<void> {
 export async function listCredentials(): Promise<CredentialStatus[]> {
   const allKeys: CredentialKey[] = ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_USER_ID', 'GEMINI_KEY', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_4', 'GEMINI_KEY_5'];
   const rows = await sheetsService.getAllCredentialRows();
+  const encryptionKey = getEncryptionKey();
 
   return allKeys.map((key) => {
     const row = rows.find((r) => r.key === key);
+    let preview: string | undefined;
+    if (row?.ciphertext) {
+      try {
+        const plaintext = decrypt({ iv: row.iv, ciphertext: row.ciphertext, tag: row.tag }, encryptionKey);
+        preview = plaintext.slice(0, 8) + '••••';
+      } catch {
+        preview = '••••••••';
+      }
+    }
     return {
       key,
       configured: !!row?.ciphertext,
+      preview,
       updatedAt: row?.updatedAt,
     };
   });

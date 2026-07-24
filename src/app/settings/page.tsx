@@ -197,6 +197,10 @@ export default function SettingsPage() {
     return credentials.find((c) => c.key === key)?.configured ?? false;
   }
 
+  function getKeyPreview(key: CredentialKey): string {
+    return credentials.find((c) => c.key === key)?.preview || '••••••••';
+  }
+
   async function handleSaveKey(key: CredentialKey) {
     const value = inputValues[key].trim();
     if (!value) return;
@@ -606,7 +610,7 @@ export default function SettingsPage() {
                   {isConfigured(slot) ? (
                     <div className="flex-1 flex items-center gap-2">
                       <span className="text-xs font-mono text-slate-500">
-                        {showKey[slot] ? (inputValues[slot] || '••••••••') : '••••••••'}
+                        {showKey[slot] ? getKeyPreview(slot) : '••••••••••••'}
                       </span>
                       <button type="button" onClick={() => setShowKey((prev) => ({ ...prev, [slot]: !prev[slot] }))} className="text-slate-400 hover:text-slate-200">
                         {showKey[slot] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}

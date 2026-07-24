@@ -190,6 +190,7 @@ export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GE
 export interface CredentialStatus {
   key: CredentialKey;
   configured: boolean;
+  preview?: string;            // 키 앞 8자 미리보기 (예: "AIzaSyB2...")
   updatedAt?: string;
 }
 
