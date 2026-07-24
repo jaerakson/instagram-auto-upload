@@ -57,9 +57,15 @@ export class GoogleSheetsService {
   }
 
   async addPost(post: PostRecord): Promise<void> {
-    await this.sheets.spreadsheets.values.append({
+    // 마지막 행 번호를 조회하여 그 다음에 삽입 (빈 행 건너뛰기 방지)
+    const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_POSTS}!A:T`,
+      range: `${SHEET_POSTS}!A:A`,
+    });
+    const lastRow = (res.data.values?.length ?? 1) + 1;
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_POSTS}!A${lastRow}:T${lastRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -137,6 +143,77 @@ export class GoogleSheetsService {
     });
   }
 
+  async batchUpdatePosts(updates: Array<{ id: string; updates: Partial<PostRecord> }>): Promise<{ success: number; errors: string[] }> {
+    if (updates.length === 0) return { success: 0, errors: [] };
+
+    // 1회 조회로 전체 데이터 로드
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_POSTS}!A2:T`,
+    });
+    const allRows = res.data.values || [];
+
+    // id → row index 맵
+    const idToIndex = new Map<string, number>();
+    for (let i = 0; i < allRows.length; i++) {
+      if (allRows[i][0]) idToIndex.set(allRows[i][0], i);
+    }
+
+    let success = 0;
+    const errors: string[] = [];
+
+    // batchUpdate로 여러 행을 한번에 업데이트
+    const batchData: Array<{ range: string; values: string[][] }> = [];
+    for (const { id, updates: u } of updates) {
+      const rowIndex = idToIndex.get(id);
+      if (rowIndex === undefined) {
+        errors.push(`${id}: not found`);
+        continue;
+      }
+      const current = allRows[rowIndex];
+      const rowNumber = rowIndex + 2;
+      const merged = [
+        u.id ?? current[0] ?? '',
+        u.date ?? current[1] ?? '',
+        u.prompt ?? current[2] ?? '',
+        u.caption ?? current[3] ?? '',
+        u.hashtags ?? current[4] ?? '',
+        u.imageUrl ?? current[5] ?? '',
+        u.mediaId ?? current[6] ?? '',
+        u.mediaUrl ?? current[7] ?? '',
+        u.status ?? current[8] ?? '',
+        u.trendReport ?? current[9] ?? '',
+        u.style ?? current[10] ?? '',
+        u.currentStep ?? current[11] ?? '',
+        u.mediaType ?? current[12] ?? '',
+        u.stylePreset ?? current[13] ?? '',
+        u.captionLang ?? current[14] ?? '',
+        u.trendPreset ?? current[15] ?? '',
+        u.totalTokens ?? current[16] ?? '',
+        u.totalCost ?? current[17] ?? '',
+        u.retryCount ?? current[18] ?? '',
+        u.error ?? current[19] ?? '',
+      ];
+      batchData.push({
+        range: `${SHEET_POSTS}!A${rowNumber}:T${rowNumber}`,
+        values: [merged],
+      });
+      success++;
+    }
+
+    if (batchData.length > 0) {
+      await this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: {
+          valueInputOption: 'USER_ENTERED',
+          data: batchData,
+        },
+      });
+    }
+
+    return { success, errors };
+  }
+
   async deletePost(id: string): Promise<void> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
@@ -170,7 +247,7 @@ export class GoogleSheetsService {
   async getPerformance(): Promise<PerformanceRecord[]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_PERFORMANCE}!A2:G`,
+      range: `${SHEET_PERFORMANCE}!A2:H`,
     });
     const rows = res.data.values || [];
     return rows.map((row) => ({
@@ -181,13 +258,14 @@ export class GoogleSheetsService {
       saves: Number(row[4]) || 0,
       reach: Number(row[5]) || 0,
       followersDelta: Number(row[6]) || 0,
+      impressions: Number(row[7]) || 0,
     }));
   }
 
   async addPerformance(record: PerformanceRecord): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: `${SHEET_PERFORMANCE}!A:G`,
+      range: `${SHEET_PERFORMANCE}!A:H`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -198,6 +276,7 @@ export class GoogleSheetsService {
           record.saves,
           record.reach,
           record.followersDelta,
+          record.impressions,
         ]],
       },
     });
@@ -219,24 +298,75 @@ export class GoogleSheetsService {
       record.saves,
       record.reach,
       record.followersDelta,
+      record.impressions,
     ]];
 
     if (rowIndex >= 0) {
       const rowNumber = rowIndex + 2;
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${SHEET_PERFORMANCE}!A${rowNumber}:G${rowNumber}`,
+        range: `${SHEET_PERFORMANCE}!A${rowNumber}:H${rowNumber}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values },
       });
     } else {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${SHEET_PERFORMANCE}!A:G`,
+        range: `${SHEET_PERFORMANCE}!A:H`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values },
       });
     }
+  }
+
+  async batchUpsertPerformance(records: PerformanceRecord[]): Promise<{ success: number; errors: string[] }> {
+    if (records.length === 0) return { success: 0, errors: [] };
+
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${SHEET_PERFORMANCE}!A2:H`,
+    });
+    const allRows = res.data.values || [];
+    const idToIndex = new Map<string, number>();
+    for (let i = 0; i < allRows.length; i++) {
+      if (allRows[i][0]) idToIndex.set(allRows[i][0], i);
+    }
+
+    const batchData: Array<{ range: string; values: (string | number)[][] }> = [];
+    const appendData: (string | number)[][] = [];
+    let success = 0;
+
+    for (const record of records) {
+      const row = [record.mediaId, record.date, record.likes, record.comments, record.saves, record.reach, record.followersDelta, record.impressions];
+      const existingIndex = idToIndex.get(record.mediaId);
+      if (existingIndex !== undefined) {
+        batchData.push({
+          range: `${SHEET_PERFORMANCE}!A${existingIndex + 2}:H${existingIndex + 2}`,
+          values: [row],
+        });
+      } else {
+        appendData.push(row);
+      }
+      success++;
+    }
+
+    if (batchData.length > 0) {
+      await this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: { valueInputOption: 'USER_ENTERED', data: batchData },
+      });
+    }
+    if (appendData.length > 0) {
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: `${SHEET_PERFORMANCE}!A:H`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: appendData },
+      });
+    }
+
+    return { success, errors: [] };
   }
 
   // 설정
@@ -280,10 +410,14 @@ export class GoogleSheetsService {
       generatePrompt: settingsMap.get('generatePrompt') || DEFAULT_GENERATE_PROMPT,
       mediaType: (settingsMap.get('mediaType') || 'image') as AppSettings['mediaType'],
       stylePreset: (settingsMap.get('stylePreset') || 'photorealistic') as AppSettings['stylePreset'],
+      subjectPreset: (settingsMap.get('subjectPreset') || 'woman') as AppSettings['subjectPreset'],
+      subjectCustom: settingsMap.get('subjectCustom') || '',
       stylePrompts,
       imageQuality: (settingsMap.get('imageQuality') || 'standard') as AppSettings['imageQuality'],
+      captionLength: Number(settingsMap.get('captionLength')) || 150,
       googleDriveAutoSave: toBool(settingsMap.get('googleDriveAutoSave')),
       googleDriveFolderId: settingsMap.get('googleDriveFolderId') || '',
+      geminiKeyOrder: settingsMap.get('geminiKeyOrder') || 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5',
       instagramConnected: toBool(settingsMap.get('instagramConnected')),
       googleSheetsConnected: toBool(settingsMap.get('googleSheetsConnected')),
       geminiConnected: toBool(settingsMap.get('geminiConnected')),
@@ -304,9 +438,13 @@ export class GoogleSheetsService {
       ['generatePrompt', merged.generatePrompt || DEFAULT_GENERATE_PROMPT],
       ['mediaType', merged.mediaType || 'image'],
       ['stylePreset', merged.stylePreset || 'photorealistic'],
+      ['subjectPreset', merged.subjectPreset || 'woman'],
+      ['subjectCustom', merged.subjectCustom || ''],
       ['imageQuality', merged.imageQuality || 'standard'],
+      ['captionLength', String(merged.captionLength || 150)],
       ['googleDriveAutoSave', String(merged.googleDriveAutoSave ?? false)],
       ['googleDriveFolderId', merged.googleDriveFolderId || ''],
+      ['geminiKeyOrder', merged.geminiKeyOrder || 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5'],
       ['instagramConnected', String(merged.instagramConnected)],
       ['googleSheetsConnected', String(merged.googleSheetsConnected)],
       ['geminiConnected', String(merged.geminiConnected)],

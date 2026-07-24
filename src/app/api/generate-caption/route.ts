@@ -4,7 +4,7 @@ import type { ApiResponse, TrendResult } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const { prompt, style, language, trendKeywords, mode } = await request.json();
+    const { prompt, style, language, trendKeywords, mode, captionLength } = await request.json();
 
     if (!prompt) {
       return NextResponse.json<ApiResponse>(
@@ -32,17 +32,19 @@ export async function POST(request: Request) {
     }
 
     const geminiService = await getGeminiService();
+    geminiService.resetToFirstKey();
     const result = await geminiService.generateCaptionWithRetry({
       prompt,
       style,
       language: lang,
       trendContext,
       mode: captionMode,
+      captionLength: captionLength || undefined,
     });
 
-    return NextResponse.json<ApiResponse<{ caption: string; hashtags: string; totalTokens: number; totalCost: number }>>({
+    return NextResponse.json<ApiResponse<{ caption: string; hashtags: string; totalTokens: number; totalCost: number; geminiKeyUsed: number }>>({
       success: true,
-      data: { caption: result.caption, hashtags: result.hashtags, totalTokens: result.usage?.totalTokens ?? 0, totalCost: result.usage?.cost ?? 0 },
+      data: { caption: result.caption, hashtags: result.hashtags, totalTokens: result.usage?.totalTokens ?? 0, totalCost: result.usage?.cost ?? 0, geminiKeyUsed: geminiService.activeKeyIndex + 1 },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

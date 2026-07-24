@@ -2,17 +2,22 @@ import { NextResponse } from 'next/server';
 import { getGeminiService } from '@/lib/services';
 import { sheetsService } from '@/lib/google-sheets';
 import type { ApiResponse, PerformanceRecord } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_SUBJECT_PROMPTS, DEFAULT_TREND_PROMPT } from '@/types';
+import type { SubjectPreset } from '@/types';
 
 export async function POST(request: Request) {
   try {
     let stylePreset = 'photorealistic';
+    let subjectPreset: SubjectPreset = 'woman';
+    let subjectCustom = '';
     let stylePromptOverride = '';
     let trendPromptOverride = '';
     let generatePromptOverride = '';
     try {
       const body = await request.json();
       if (body.stylePreset) stylePreset = body.stylePreset;
+      if (body.subjectPreset) subjectPreset = body.subjectPreset;
+      if (body.subjectCustom) subjectCustom = body.subjectCustom;
       if (body.stylePrompt) stylePromptOverride = body.stylePrompt;
       if (body.trendPrompt) trendPromptOverride = body.trendPrompt;
       if (body.generatePrompt) generatePromptOverride = body.generatePrompt;
@@ -21,6 +26,7 @@ export async function POST(request: Request) {
     }
 
     const geminiService = await getGeminiService();
+    geminiService.resetToFirstKey();
 
     let performanceData: PerformanceRecord[] = [];
     try {
@@ -49,16 +55,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // 주제 프롬프트를 스타일에 결합
+    const subjectPrompt = subjectPreset === 'custom'
+      ? subjectCustom
+      : DEFAULT_SUBJECT_PROMPTS[subjectPreset] || '';
+    const combinedStylePrompt = subjectPrompt
+      ? `${stylePromptOverride}. SUBJECT: ${subjectPrompt}`
+      : stylePromptOverride;
+
     const trendResult = await geminiService.analyzeTrends(performanceData, trendKeywords, trendPromptOverride);
-    const result = await geminiService.generatePrompt(trendResult, stylePreset, stylePromptOverride, generatePromptOverride);
+    const result = await geminiService.generatePrompt(trendResult, stylePreset, combinedStylePrompt, generatePromptOverride);
 
     // 트렌드 + 프롬프트 생성 토큰 합산
     const totalTokens = (trendResult.usage?.totalTokens ?? 0) + (result.usage?.totalTokens ?? 0);
     const totalCost = (trendResult.usage?.cost ?? 0) + (result.usage?.cost ?? 0);
 
-    return NextResponse.json<ApiResponse<{ prompt: string; style: string; trendReport: string; totalTokens: number; totalCost: number }>>({
+    return NextResponse.json<ApiResponse<{ prompt: string; style: string; trendReport: string; totalTokens: number; totalCost: number; geminiKeyUsed: number }>>({
       success: true,
-      data: { prompt: result.prompt, style: result.style, trendReport: result.trendReport, totalTokens, totalCost },
+      data: { prompt: result.prompt, style: result.style, trendReport: result.trendReport, totalTokens, totalCost, geminiKeyUsed: geminiService.activeKeyIndex + 1 },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

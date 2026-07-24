@@ -1,7 +1,7 @@
 import { encrypt, decrypt } from './crypto';
 import { sheetsService } from './google-sheets';
 
-export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GEMINI_KEY';
+export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GEMINI_KEY' | 'GEMINI_KEY_2' | 'GEMINI_KEY_3' | 'GEMINI_KEY_4' | 'GEMINI_KEY_5';
 
 export interface CredentialStatus {
   key: CredentialKey;
@@ -55,7 +55,7 @@ export async function deleteCredential(key: CredentialKey): Promise<void> {
 }
 
 export async function listCredentials(): Promise<CredentialStatus[]> {
-  const allKeys: CredentialKey[] = ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_USER_ID', 'GEMINI_KEY'];
+  const allKeys: CredentialKey[] = ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_USER_ID', 'GEMINI_KEY', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_4', 'GEMINI_KEY_5'];
   const rows = await sheetsService.getAllCredentialRows();
 
   return allKeys.map((key) => {

@@ -22,12 +22,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { ImageIcon, Loader2, Search, X, RotateCcw, ArrowUpDown, Download } from 'lucide-react';
+import { ImageIcon, Loader2, Search, X, RotateCcw, Download, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PostRecord, PerformanceRecord } from '@/types';
 
-type StatusFilter = 'all' | 'published' | 'failed' | 'pending';
-type SortKey = 'date' | 'cost' | 'likes';
+type StatusFilter = 'all' | 'published' | 'failed' | 'pending' | 'imported';
+type SortKey = 'date' | 'reach' | 'likes' | 'comments' | 'cost' | 'status';
+type SortDir = 'asc' | 'desc';
 
 function StatusBadge({ status, error }: { status: PostRecord['status']; error?: string }) {
   const t = useTranslations('history');
@@ -64,11 +65,18 @@ export default function HistoryPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [downloadingDetail, setDownloadingDetail] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+  const [refreshingImage, setRefreshingImage] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -123,7 +131,9 @@ export default function HistoryPage() {
     let result = posts.filter(p => p.id); // filter out empty rows
 
     // Status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'imported') {
+      result = result.filter(p => !p.prompt && p.status === 'published' && p.mediaId);
+    } else if (statusFilter !== 'all') {
       result = result.filter(p => p.status === statusFilter);
     }
 
@@ -139,18 +149,18 @@ export default function HistoryPage() {
 
     // Sort
     result.sort((a, b) => {
-      if (sortKey === 'date') return new Date(b.date).getTime() - new Date(a.date).getTime();
-      if (sortKey === 'cost') return (b.totalCost || 0) - (a.totalCost || 0);
-      if (sortKey === 'likes') {
-        const aLikes = getPerf(a.mediaId)?.likes ?? 0;
-        const bLikes = getPerf(b.mediaId)?.likes ?? 0;
-        return bLikes - aLikes;
-      }
-      return 0;
+      let cmp = 0;
+      if (sortKey === 'date') cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+      else if (sortKey === 'reach') cmp = (getPerf(a.mediaId)?.reach ?? 0) - (getPerf(b.mediaId)?.reach ?? 0);
+      else if (sortKey === 'likes') cmp = (getPerf(a.mediaId)?.likes ?? 0) - (getPerf(b.mediaId)?.likes ?? 0);
+      else if (sortKey === 'comments') cmp = (getPerf(a.mediaId)?.comments ?? 0) - (getPerf(b.mediaId)?.comments ?? 0);
+      else if (sortKey === 'cost') cmp = (a.totalCost || 0) - (b.totalCost || 0);
+      else if (sortKey === 'status') cmp = a.status.localeCompare(b.status);
+      return sortDir === 'desc' ? -cmp : cmp;
     });
 
     return result;
-  }, [posts, statusFilter, searchQuery, sortKey, performance]);
+  }, [posts, statusFilter, searchQuery, sortKey, sortDir, performance]);
 
   async function handleDelete(post: PostRecord) {
     setDeletingId(post.id);
@@ -168,6 +178,58 @@ export default function HistoryPage() {
     finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handleRefreshImage(post: PostRecord, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!post.mediaId) return;
+    setRefreshingImage(post.id);
+    try {
+      const res = await fetch('/api/instagram/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, mediaId: post.mediaId }),
+      });
+      const json = await res.json();
+      if (json.success && json.data.imageUrl) {
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, imageUrl: json.data.imageUrl } : p));
+        setBrokenImages(prev => { const next = new Set(prev); next.delete(post.id); return next; });
+      }
+    } catch { /* ignore */ }
+    finally { setRefreshingImage(null); }
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/instagram/sync', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        const d = json.data;
+        setSyncResult(t('syncComplete', { imageFixed: d.imageFixed, markedDeleted: d.markedDeleted, imported: d.imported ?? 0, perfSynced: d.perfSynced ?? 0 }));
+        // 데이터 새로고침 (캐시 완전 우회)
+        const [postsRes, perfRes] = await Promise.all([
+          fetch(`/api/sheets?t=${Date.now()}`),
+          fetch(`/api/sheets/performance?t=${Date.now()}`),
+        ]);
+        if (perfRes.ok) {
+          const perfJson = await perfRes.json();
+          setPerformance(perfJson.data ?? []);
+        }
+        if (postsRes.ok) {
+          const postsJson = await postsRes.json();
+          setPosts(postsJson.data ?? []);
+        }
+      } else {
+        setSyncResult(json.error || 'Sync failed');
+      }
+    } catch {
+      setSyncResult('Sync failed');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncResult(null), 5000);
     }
   }
 
@@ -205,10 +267,21 @@ export default function HistoryPage() {
     );
   }
 
-  if (posts.length === 0) {
+  if (posts.length === 0 && !syncing && !syncResult) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncing}
+            onClick={handleSync}
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t('syncButton')}
+          </Button>
+        </div>
         <Card className="border-slate-800 bg-slate-900">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <ImageIcon className="h-12 w-12 text-slate-600" />
@@ -221,24 +294,65 @@ export default function HistoryPage() {
 
   const totalTokensSum = posts.reduce((sum, p) => sum + (p.totalTokens || 0), 0);
   const totalCostSum = posts.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+  const totalPages = Math.ceil(filteredPosts.length / pageSize);
+  const pagedPosts = filteredPosts.slice(page * pageSize, (page + 1) * pageSize);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+    setPage(0);
+  }
+
+  function SortableHead({ sortKeyVal, align, children }: { sortKeyVal: SortKey; align?: string; children: React.ReactNode }) {
+    const active = sortKey === sortKeyVal;
+    return (
+      <TableHead
+        className={cn('text-slate-400 cursor-pointer select-none hover:text-slate-200 transition-colors', align)}
+        onClick={() => toggleSort(sortKeyVal)}
+      >
+        <span className="inline-flex items-center gap-1">
+          {children}
+          {active && <span className="text-purple-400">{sortDir === 'desc' ? '↓' : '↑'}</span>}
+        </span>
+      </TableHead>
+    );
+  }
 
   const statusFilters: { key: StatusFilter; labelKey: string }[] = [
     { key: 'all', labelKey: 'filterAll' },
     { key: 'published', labelKey: 'published' },
+    { key: 'imported', labelKey: 'imported' },
     { key: 'failed', labelKey: 'failed' },
     { key: 'pending', labelKey: 'pending' },
   ];
 
-  const sortOptions: { key: SortKey; labelKey: string }[] = [
-    { key: 'date', labelKey: 'sortDate' },
-    { key: 'cost', labelKey: 'sortCost' },
-    { key: 'likes', labelKey: 'sortLikes' },
-  ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncing}
+            onClick={handleSync}
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+          >
+            {syncing ? (
+              <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{t('syncing')}</>
+            ) : (
+              <><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t('syncButton')}</>
+            )}
+          </Button>
+          {syncResult && (
+            <span className="text-xs text-emerald-400">{syncResult}</span>
+          )}
+        </div>
         {totalTokensSum > 0 && (
           <div className="flex items-center gap-4 text-xs text-slate-500">
             <span>{t('totalTokens')}: <span className="text-slate-300 font-mono">{totalTokensSum.toLocaleString()}</span></span>
@@ -256,7 +370,7 @@ export default function HistoryPage() {
           {statusFilters.map(f => (
             <button
               key={f.key}
-              onClick={() => setStatusFilter(f.key)}
+              onClick={() => { setStatusFilter(f.key); setPage(0); }}
               className={cn(
                 'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
                 statusFilter === f.key
@@ -274,7 +388,7 @@ export default function HistoryPage() {
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
           <Input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
             placeholder={t('searchPlaceholder')}
             className="h-8 pl-8 pr-8 border-slate-700 bg-slate-950 text-sm text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
           />
@@ -288,19 +402,6 @@ export default function HistoryPage() {
           )}
         </div>
 
-        {/* Sort */}
-        <div className="flex items-center gap-1.5">
-          <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
-          >
-            {sortOptions.map(o => (
-              <option key={o.key} value={o.key}>{t(o.labelKey)}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       <Card className="border-slate-800 bg-slate-900 overflow-hidden">
@@ -309,30 +410,46 @@ export default function HistoryPage() {
             <TableRow className="border-slate-800 hover:bg-transparent">
               <TableHead className="text-slate-400 w-16" />
               <TableHead className="text-slate-400">{t('caption')}</TableHead>
-              <TableHead className="text-slate-400 text-right">{t('date')}</TableHead>
-              <TableHead className="text-slate-400 text-right">{t('likes')}</TableHead>
-              <TableHead className="text-slate-400 text-right">{t('comments')}</TableHead>
-              <TableHead className="text-slate-400 text-right">Cost</TableHead>
-              <TableHead className="text-slate-400 text-center">{t('status')}</TableHead>
+              <SortableHead sortKeyVal="date" align="text-right">{t('date')}</SortableHead>
+              <SortableHead sortKeyVal="reach" align="text-right">{t('reach')}</SortableHead>
+              <SortableHead sortKeyVal="likes" align="text-right">{t('likes')}</SortableHead>
+              <SortableHead sortKeyVal="comments" align="text-right">{t('comments')}</SortableHead>
+              <SortableHead sortKeyVal="cost" align="text-right">Cost</SortableHead>
+              <SortableHead sortKeyVal="status" align="text-center">{t('status')}</SortableHead>
               <TableHead className="text-slate-400 text-center w-24">{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPosts.map((post) => {
+            {pagedPosts.map((post) => {
               const perf = getPerf(post.mediaId);
               const imgSrc = post.imageUrl || undefined;
               const isFailed = post.status === 'failed';
+              const isImported = !post.prompt && post.status === 'published' && post.mediaId;
               return (
                 <TableRow
                   key={post.id}
                   className={cn(
                     'cursor-pointer border-slate-800 hover:bg-slate-800/50',
-                    isFailed && 'bg-red-950/20'
+                    isFailed && 'bg-red-950/20',
+                    isImported && 'bg-blue-950/10'
                   )}
                   onClick={() => setSelected(post)}
                 >
                   <TableCell className="py-2">
-                    {imgSrc?.includes('.mp4') ? (
+                    {brokenImages.has(post.id) || !imgSrc ? (
+                      <button
+                        onClick={(e) => handleRefreshImage(post, e)}
+                        disabled={refreshingImage === post.id || !post.mediaId}
+                        className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                        title={t('refreshImage')}
+                      >
+                        {refreshingImage === post.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 text-slate-500" />
+                        )}
+                      </button>
+                    ) : imgSrc?.includes('.mp4') ? (
                       <video
                         src={imgSrc}
                         muted
@@ -341,18 +458,15 @@ export default function HistoryPage() {
                         playsInline
                         className="h-12 w-12 rounded-lg object-cover"
                       />
-                    ) : imgSrc ? (
+                    ) : (
                       <img
                         src={imgSrc}
                         alt=""
                         className="h-12 w-12 rounded-lg object-cover"
                         width={48}
                         height={48}
+                        onError={() => setBrokenImages(prev => new Set(prev).add(post.id))}
                       />
-                    ) : (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800">
-                        <ImageIcon className="h-5 w-5 text-slate-600" />
-                      </div>
                     )}
                   </TableCell>
                   <TableCell className="max-w-[200px] text-sm text-slate-300">
@@ -372,6 +486,14 @@ export default function HistoryPage() {
                     {new Date(post.date).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right text-sm text-slate-300">
+                    {perf?.impressions || perf?.reach ? (
+                      <span>
+                        {(perf.impressions || perf.reach).toLocaleString()}
+                        {perf.impressions && perf.reach ? <span className="text-slate-500">({perf.reach.toLocaleString()})</span> : null}
+                      </span>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-slate-300">
                     {perf?.likes ?? '-'}
                   </TableCell>
                   <TableCell className="text-right text-sm text-slate-300">
@@ -387,7 +509,11 @@ export default function HistoryPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
-                      <StatusBadge status={post.status} error={post.error} />
+                      {isImported ? (
+                        <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Instagram</Badge>
+                      ) : (
+                        <StatusBadge status={post.status} error={post.error} />
+                      )}
                       {post.retryCount ? (
                         <span className="text-[10px] text-slate-500">{t('retryCountLabel', { count: post.retryCount })}</span>
                       ) : null}
@@ -444,6 +570,49 @@ export default function HistoryPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pagination */}
+      {filteredPosts.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span>{t('rowsPerPage')}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+              className="rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
+            >
+              {[10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>{page * pageSize + 1}–{Math.min((page + 1) * pageSize, filteredPosts.length)} / {filteredPosts.length}</span>
+            <div className="flex gap-1">
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(0)}
+                className="rounded px-1.5 py-1 hover:bg-slate-800 disabled:opacity-30"
+              >«</button>
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}
+                className="rounded px-1.5 py-1 hover:bg-slate-800 disabled:opacity-30"
+              >‹</button>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => p + 1)}
+                className="rounded px-1.5 py-1 hover:bg-slate-800 disabled:opacity-30"
+              >›</button>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(totalPages - 1)}
+                className="rounded px-1.5 py-1 hover:bg-slate-800 disabled:opacity-30"
+              >»</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail Sheet */}
       <Sheet open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>

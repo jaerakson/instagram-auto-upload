@@ -27,6 +27,7 @@ import type { PostRecord, PerformanceRecord, WeeklyEngagement } from '@/types';
 
 interface StylePerformance {
   style: string;
+  avgViews: number;
   avgLikes: number;
   avgComments: number;
   avgSaves: number;
@@ -90,7 +91,8 @@ export default function AnalyticsPage() {
 
         // weeklyEngagement: map performance data directly
         const weekly = performanceData.map((p) => ({
-          date: p.date.slice(5, 10), // "07-18" format
+          date: p.date.slice(5, 10),
+          views: p.impressions || p.reach || 0,
           likes: p.likes,
           comments: p.comments,
           saves: p.saves,
@@ -98,18 +100,20 @@ export default function AnalyticsPage() {
         setWeeklyEngagement(weekly);
 
         // stylePerformance: group by post style, average the metrics
-        const styleMap = new Map<string, { likes: number[]; comments: number[]; saves: number[] }>();
+        const styleMap = new Map<string, { views: number[]; likes: number[]; comments: number[]; saves: number[] }>();
         posts.forEach((post) => {
           const perf = performanceData.find((p) => p.mediaId === post.mediaId);
           if (!perf || !post.style) return;
-          if (!styleMap.has(post.style)) styleMap.set(post.style, { likes: [], comments: [], saves: [] });
+          if (!styleMap.has(post.style)) styleMap.set(post.style, { views: [], likes: [], comments: [], saves: [] });
           const s = styleMap.get(post.style)!;
+          s.views.push(perf.impressions || perf.reach || 0);
           s.likes.push(perf.likes);
           s.comments.push(perf.comments);
           s.saves.push(perf.saves);
         });
         const styles = Array.from(styleMap.entries()).map(([style, data]) => ({
           style,
+          avgViews: Math.round(data.views.reduce((a, b) => a + b, 0) / data.views.length),
           avgLikes: Math.round(data.likes.reduce((a, b) => a + b, 0) / data.likes.length),
           avgComments: Math.round(data.comments.reduce((a, b) => a + b, 0) / data.comments.length),
           avgSaves: Math.round(data.saves.reduce((a, b) => a + b, 0) / data.saves.length),
@@ -236,6 +240,7 @@ export default function AnalyticsPage() {
                   labelStyle={{ color: '#e2e8f0' }}
                 />
                 <Legend />
+                <Line type="monotone" dataKey="views" name={t('views')} stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
                 <Line type="monotone" dataKey="likes" name={t('likes')} stroke="#a855f7" strokeWidth={2} dot={{ fill: '#a855f7', r: 3 }} />
                 <Line type="monotone" dataKey="comments" name={t('comments')} stroke="#ec4899" strokeWidth={2} dot={{ fill: '#ec4899', r: 3 }} />
                 <Line type="monotone" dataKey="saves" name={t('saves')} stroke="#fb923c" strokeWidth={2} dot={{ fill: '#fb923c', r: 3 }} />
@@ -252,22 +257,28 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 mb-4 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />{t('views')}</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-purple-500" />{t('likes')}</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-pink-500" />{t('comments')}</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />{t('saves')}</span>
           </div>
           <div className="space-y-4">
             {stylePerformance.map((item) => {
-              const max = Math.max(...stylePerformance.map((s) => s.avgLikes));
+              const max = Math.max(...stylePerformance.map((s) => s.avgViews), 1);
               return (
                 <div key={item.style} className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-300 capitalize">{item.style}</span>
-                    <span className="text-xs text-slate-500">{item.avgLikes + item.avgComments + item.avgSaves} total</span>
+                    <span className="text-xs text-slate-500">{t('views')} {item.avgViews} · {t('likes')} {item.avgLikes}</span>
                   </div>
                   <div className="flex gap-1 h-6">
                     <div
-                      className="rounded-l bg-purple-500 transition-all"
+                      className="rounded-l bg-blue-500 transition-all"
+                      style={{ width: `${(item.avgViews / max) * 100}%` }}
+                      title={`${t('views')}: ${item.avgViews}`}
+                    />
+                    <div
+                      className="bg-purple-500 transition-all"
                       style={{ width: `${(item.avgLikes / max) * 100}%` }}
                       title={`${t('likes')}: ${item.avgLikes}`}
                     />

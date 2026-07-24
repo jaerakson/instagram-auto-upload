@@ -57,6 +57,7 @@ export async function POST(request: Request) {
           comments: insights.comments,
           saves: insights.saves,
           reach: insights.reach,
+          impressions: insights.impressions,
           followersDelta,
         };
         await sheetsService.upsertPerformance(record);

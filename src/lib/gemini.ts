@@ -2,10 +2,85 @@ import { put } from '@vercel/blob';
 import type { TrendResult, PerformanceRecord, UsageInfo } from '@/types';
 
 export class GeminiService {
-  private apiKey: string;
+  private apiKeys: string[];
+  private currentKeyIndex = 0;
 
-  constructor(config: { apiKey: string }) {
-    this.apiKey = config.apiKey;
+  constructor(config: { apiKeys: string[] } | { apiKey: string }) {
+    this.apiKeys = 'apiKeys' in config ? config.apiKeys : [config.apiKey];
+  }
+
+  private get apiKey(): string {
+    return this.apiKeys[this.currentKeyIndex];
+  }
+
+  get activeKeyIndex(): number {
+    return this.currentKeyIndex;
+  }
+
+  get totalKeys(): number {
+    return this.apiKeys.length;
+  }
+
+  resetToFirstKey(): void {
+    this.currentKeyIndex = 0;
+  }
+
+  private rotateKey(): boolean {
+    if (this.apiKeys.length <= 1) return false;
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+    return true;
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message.toLowerCase() : '';
+    return msg.includes('429') || msg.includes('rate') || msg.includes('quota')
+      || msg.includes('resource exhausted') || msg.includes('no longer available') || msg.includes('not available');
+  }
+
+  private static readonly RETRIES_PER_KEY = 3;
+
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    for (let keyIdx = 0; keyIdx < this.apiKeys.length; keyIdx++) {
+      for (let attempt = 1; attempt <= GeminiService.RETRIES_PER_KEY; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          if (!this.isRetryableError(error)) throw error;
+          console.log(`[Gemini] Key #${this.currentKeyIndex + 1} attempt ${attempt}/${GeminiService.RETRIES_PER_KEY} failed`);
+          if (attempt < GeminiService.RETRIES_PER_KEY) {
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+            continue;
+          }
+          // 3번 실패 → 다음 키로
+          if (!this.rotateKey()) throw error;
+          console.log(`[Gemini] Switched to key #${this.currentKeyIndex + 1}/${this.apiKeys.length}`);
+        }
+      }
+    }
+    throw new Error('All Gemini API keys exhausted');
+  }
+
+  private shouldRotateKey(status: number, message: string): boolean {
+    const msg = message.toLowerCase();
+    return status === 429
+      || msg.includes('quota')
+      || msg.includes('rate')
+      || msg.includes('resource exhausted')
+      || msg.includes('no longer available')
+      || msg.includes('not available');
+  }
+
+  private async checkResponse(res: Response): Promise<void> {
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      const errMsg = error.error?.message || `Gemini API error: ${res.status}`;
+      if (this.shouldRotateKey(res.status, errMsg)) {
+        if (this.rotateKey()) {
+          console.log(`[Gemini] Error → rotated to key ${this.currentKeyIndex + 1}/${this.apiKeys.length}: ${errMsg.slice(0, 80)}`);
+        }
+      }
+      throw new Error(errMsg);
+    }
   }
 
   // Gemini 2.5 Flash 비용: 입력 $0.15/1M, 출력 $0.60/1M
@@ -53,6 +128,7 @@ export class GeminiService {
   }
 
   async analyzeTrends(performanceData?: PerformanceRecord[], trendKeywords?: string, trendPromptOverride?: string): Promise<TrendResult & { usage?: UsageInfo }> {
+    return this.withRetry(async () => {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let performanceSection = '';
@@ -110,6 +186,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       throw new Error('Gemini trend response missing required fields');
     }
     return { ...parsed, usage };
+    });
   }
 
   async generatePrompt(
@@ -118,6 +195,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     stylePromptOverride?: string,
     generatePromptOverride?: string,
   ): Promise<{ prompt: string; style: string; trendReport: string; usage?: UsageInfo }> {
+    return this.withRetry(async () => {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     let trendSection = '';
@@ -192,6 +270,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       trendReport: trendContext?.summary ?? '',
       usage,
     };
+    });
   }
 
   async generateImage(
@@ -350,7 +429,9 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     language: 'ko' | 'en' | 'ko+en' | 'ja' | 'ja+ko';
     trendContext?: TrendResult & { usage?: UsageInfo };
     mode: 'full' | 'caption_only' | 'hashtags_only';
+    captionLength?: number;
   }): Promise<{ caption: string; hashtags: string; usage?: UsageInfo }> {
+    return this.withRetry(async () => {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
 
     const languageToneMap: Record<string, string> = {
@@ -399,7 +480,7 @@ ${modeInstruction[options.mode]}
 
 Rules:
 - The caption should complement the image described by the prompt, not describe it literally
-- Keep the caption concise (2-4 lines max) and engaging
+- CRITICAL: The caption MUST be approximately ${options.captionLength || 150} characters long (not words, CHARACTERS including spaces). ${(options.captionLength || 150) <= 100 ? 'Keep it very short, 1-2 lines max.' : (options.captionLength || 150) <= 200 ? 'Keep it concise, 2-3 lines.' : (options.captionLength || 150) <= 350 ? 'Write a medium-length caption, 4-6 lines.' : 'Write a detailed, longer caption, 6-10 lines.'} Count carefully before responding
 - Generate 20-30 hashtags for maximum reach. Mix popular high-volume tags with niche specific tags. Include a variety: AI art tags, style-specific tags, mood tags, and trending tags
 - Do NOT use generic hashtags like #ai or #photo alone — be specific
 - The tone should feel personal and authentic, not like marketing copy${trendSection}
@@ -445,6 +526,7 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
       hashtags: parsed.hashtags || '',
       usage,
     };
+    });
   }
 
   private validateCaptionLanguage(
@@ -534,15 +616,25 @@ Respond ONLY in this exact JSON format (no markdown, no code blocks):
     options: Parameters<GeminiService['generateCaption']>[0],
     maxRetries = 5,
   ): Promise<{ caption: string; hashtags: string; usage?: UsageInfo }> {
+    let accumulatedUsage: UsageInfo = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const result = await this.generateCaption(options);
+      if (result.usage) {
+        accumulatedUsage = {
+          inputTokens: accumulatedUsage.inputTokens + result.usage.inputTokens,
+          outputTokens: accumulatedUsage.outputTokens + result.usage.outputTokens,
+          totalTokens: accumulatedUsage.totalTokens + result.usage.totalTokens,
+          cost: accumulatedUsage.cost + result.usage.cost,
+        };
+      }
       if (this.validateCaptionLanguage(result.caption, result.hashtags, options.language)) {
-        return result;
+        return { ...result, usage: accumulatedUsage };
       }
       if (attempt === maxRetries) {
-        return result; // Return last attempt even if validation fails
+        return { ...result, usage: accumulatedUsage };
       }
     }
-    return this.generateCaption(options); // Fallback
+    // maxRetries 도달 시 루프 내에서 이미 반환됨
+    throw new Error('Caption generation failed after all retries');
   }
 }

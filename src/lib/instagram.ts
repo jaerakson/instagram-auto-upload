@@ -45,11 +45,12 @@ export class InstagramService {
   }
 
   async uploadPhoto(imageUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
+    // Phase 1: Container 생성 (한 번만, 실패 시 재시도)
+    let containerId: string | null = null;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Step 1: Create media container
         const container = await this.request<{ id: string }>(
           `${this.baseUrl}/${this.userId}/media`,
           {
@@ -62,21 +63,40 @@ export class InstagramService {
             }),
           },
         );
+        containerId = container.id;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Instagram] container 생성 attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (this.isNonRetryableError(lastError)) break;
+        if (attempt < maxRetries) {
+          const delay = this.getRetryDelay(attempt);
+          console.log(`[Instagram] ${delay / 1000}초 후 재시도...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
 
-        // Step 2: Publish media
+    if (!containerId) {
+      throw new Error(`Container 생성 실패: ${this.formatError(lastError!)}`);
+    }
+
+    // Phase 2: Publish (같은 containerId 재사용, 멱등성 보장)
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
         const published = await this.request<{ id: string }>(
           `${this.baseUrl}/${this.userId}/media_publish`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              creation_id: container.id,
+              creation_id: containerId,
               access_token: this.accessToken,
             }),
           },
         );
 
-        // Step 3: Fetch permalink and media_url (actual image URL)
+        // Step 3: Fetch permalink and media_url (non-critical)
         let mediaUrl = '';
         let instagramImageUrl = '';
         try {
@@ -92,11 +112,8 @@ export class InstagramService {
         return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Instagram] uploadPhoto attempt ${attempt}/${maxRetries} failed:`, lastError.message);
-        if (this.isNonRetryableError(lastError)) {
-          console.error(`[Instagram] 재시도 불가 에러 — 즉시 중단`);
-          break;
-        }
+        console.error(`[Instagram] publish attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (this.isNonRetryableError(lastError)) break;
         if (attempt < maxRetries) {
           const delay = this.getRetryDelay(attempt);
           console.log(`[Instagram] ${delay / 1000}초 후 재시도...`);
@@ -109,11 +126,12 @@ export class InstagramService {
   }
 
   async uploadReels(videoUrl: string, caption: string, maxRetries = 10): Promise<{ mediaId: string; mediaUrl: string; imageUrl: string }> {
+    // Phase 1: Container 생성 + Processing 대기
+    let containerId: string | null = null;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Step 1: Create REELS container
         const container = await this.request<{ id: string }>(
           `${this.baseUrl}/${this.userId}/media`,
           {
@@ -127,13 +145,14 @@ export class InstagramService {
             }),
           },
         );
+        containerId = container.id;
 
-        // Step 2: Poll for processing completion (max 3 minutes)
+        // Poll for processing completion (max 3 minutes)
         let processingDone = false;
         for (let i = 0; i < 36; i++) {
           await new Promise(r => setTimeout(r, 5000));
           const status = await this.request<{ status_code: string; status?: string }>(
-            `${this.baseUrl}/${container.id}?fields=status_code,status&access_token=${this.accessToken}`
+            `${this.baseUrl}/${containerId}?fields=status_code,status&access_token=${this.accessToken}`
           );
           console.log(`[Instagram] Reels processing poll ${i + 1}/36: status_code=${status.status_code}, status=${status.status || ''}`);
           if (status.status_code === 'FINISHED') {
@@ -147,21 +166,39 @@ export class InstagramService {
         if (!processingDone) {
           throw new Error('Reels 처리 타임아웃 (3분 초과)');
         }
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Instagram] reels container attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        containerId = null;
+        if (this.isNonRetryableError(lastError)) break;
+        if (attempt < maxRetries) {
+          const delay = this.getRetryDelay(attempt);
+          console.log(`[Instagram] ${delay / 1000}초 후 재시도...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
 
-        // Step 3: Publish
+    if (!containerId) {
+      throw new Error(`Reels container 생성 실패: ${this.formatError(lastError!)}`);
+    }
+
+    // Phase 2: Publish (같은 containerId 재사용)
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
         const published = await this.request<{ id: string }>(
           `${this.baseUrl}/${this.userId}/media_publish`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              creation_id: container.id,
+              creation_id: containerId,
               access_token: this.accessToken,
             }),
           },
         );
 
-        // Step 4: Fetch permalink and media_url
         let mediaUrl = '';
         let instagramImageUrl = '';
         try {
@@ -177,11 +214,8 @@ export class InstagramService {
         return { mediaId: published.id, mediaUrl, imageUrl: instagramImageUrl };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Instagram] uploadReels attempt ${attempt}/${maxRetries} failed:`, lastError.message);
-        if (this.isNonRetryableError(lastError)) {
-          console.error(`[Instagram] 재시도 불가 에러 — 즉시 중단`);
-          break;
-        }
+        console.error(`[Instagram] reels publish attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (this.isNonRetryableError(lastError)) break;
         if (attempt < maxRetries) {
           const delay = this.getRetryDelay(attempt);
           console.log(`[Instagram] ${delay / 1000}초 후 재시도...`);
@@ -205,6 +239,7 @@ export class InstagramService {
     comments: number;
     saves: number;
     reach: number;
+    impressions: number;
   }> {
     const res = await this.request<{
       data: Array<{ name: string; values: Array<{ value: number }> }>;
@@ -217,11 +252,25 @@ export class InstagramService {
       metrics[item.name] = item.values[0]?.value ?? 0;
     }
 
+    // views metric (v25.0+에서 impressions 대체)
+    let impressions = 0;
+    try {
+      const viewsRes = await this.request<{
+        data: Array<{ name: string; values: Array<{ value: number }> }>;
+      }>(
+        `${this.baseUrl}/${mediaId}/insights?metric=views&access_token=${this.accessToken}`,
+      );
+      impressions = viewsRes.data[0]?.values[0]?.value ?? 0;
+    } catch (e) {
+      console.error(`[Instagram] views metric failed for ${mediaId}:`, e instanceof Error ? e.message : e);
+    }
+
     return {
       likes: metrics['likes'] ?? 0,
       comments: metrics['comments'] ?? 0,
       saves: metrics['saved'] ?? 0,
       reach: metrics['reach'] ?? 0,
+      impressions,
     };
   }
 
@@ -229,6 +278,7 @@ export class InstagramService {
     Array<{
       id: string;
       mediaUrl: string;
+      permalink: string;
       caption: string;
       timestamp: string;
       likeCount: number;
@@ -239,18 +289,20 @@ export class InstagramService {
       data: Array<{
         id: string;
         media_url: string;
+        permalink: string;
         caption: string;
         timestamp: string;
         like_count: number;
         comments_count: number;
       }>;
     }>(
-      `${this.baseUrl}/${this.userId}/media?fields=id,media_url,caption,timestamp,like_count,comments_count&limit=${limit}&access_token=${this.accessToken}`,
+      `${this.baseUrl}/${this.userId}/media?fields=id,media_url,permalink,caption,timestamp,like_count,comments_count&limit=${limit}&access_token=${this.accessToken}`,
     );
 
     return res.data.map((item) => ({
       id: item.id,
       mediaUrl: item.media_url,
+      permalink: item.permalink || '',
       caption: item.caption || '',
       timestamp: item.timestamp,
       likeCount: item.like_count ?? 0,

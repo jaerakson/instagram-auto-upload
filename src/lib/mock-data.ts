@@ -88,21 +88,21 @@ export const mockPosts: PostRecord[] = [
 ];
 
 export const mockPerformance: PerformanceRecord[] = [
-  { mediaId: 'mock-media-1', date: '2026-07-18', likes: 342, comments: 28, saves: 56, reach: 4200, followersDelta: 12 },
-  { mediaId: 'mock-media-2', date: '2026-07-17', likes: 289, comments: 19, saves: 41, reach: 3600, followersDelta: 8 },
-  { mediaId: 'mock-media-3', date: '2026-07-16', likes: 415, comments: 35, saves: 72, reach: 5100, followersDelta: 18 },
-  { mediaId: 'mock-media-4', date: '2026-07-15', likes: 198, comments: 14, saves: 29, reach: 2800, followersDelta: 5 },
-  { mediaId: 'mock-media-5', date: '2026-07-14', likes: 523, comments: 42, saves: 88, reach: 6200, followersDelta: 24 },
+  { mediaId: 'mock-media-1', date: '2026-07-18', likes: 342, comments: 28, saves: 56, reach: 4200, impressions: 5800, followersDelta: 12 },
+  { mediaId: 'mock-media-2', date: '2026-07-17', likes: 289, comments: 19, saves: 41, reach: 3600, impressions: 4900, followersDelta: 8 },
+  { mediaId: 'mock-media-3', date: '2026-07-16', likes: 415, comments: 35, saves: 72, reach: 5100, impressions: 7200, followersDelta: 18 },
+  { mediaId: 'mock-media-4', date: '2026-07-15', likes: 198, comments: 14, saves: 29, reach: 2800, impressions: 3500, followersDelta: 5 },
+  { mediaId: 'mock-media-5', date: '2026-07-14', likes: 523, comments: 42, saves: 88, reach: 6200, impressions: 8600, followersDelta: 24 },
 ];
 
 export const mockWeeklyEngagement: WeeklyEngagement[] = [
-  { date: '07/13', likes: 180, comments: 12, saves: 22 },
-  { date: '07/14', likes: 523, comments: 42, saves: 88 },
-  { date: '07/15', likes: 198, comments: 14, saves: 29 },
-  { date: '07/16', likes: 415, comments: 35, saves: 72 },
-  { date: '07/17', likes: 289, comments: 19, saves: 41 },
-  { date: '07/18', likes: 342, comments: 28, saves: 56 },
-  { date: '07/19', likes: 267, comments: 21, saves: 38 },
+  { date: '07/13', views: 2100, likes: 180, comments: 12, saves: 22 },
+  { date: '07/14', views: 6200, likes: 523, comments: 42, saves: 88 },
+  { date: '07/15', views: 2800, likes: 198, comments: 14, saves: 29 },
+  { date: '07/16', views: 5100, likes: 415, comments: 35, saves: 72 },
+  { date: '07/17', views: 3600, likes: 289, comments: 19, saves: 41 },
+  { date: '07/18', views: 4200, likes: 342, comments: 28, saves: 56 },
+  { date: '07/19', views: 3300, likes: 267, comments: 21, saves: 38 },
 ];
 
 export const mockDashboard: DashboardSummary = {
@@ -127,8 +127,12 @@ export const mockSettings: AppSettings = {
   stylePreset: 'photorealistic' as const,
   stylePrompts: {},
   imageQuality: 'standard' as const,
+  captionLength: 150,
+  subjectPreset: 'woman' as const,
+  subjectCustom: '',
   googleDriveAutoSave: false,
   googleDriveFolderId: '',
+  geminiKeyOrder: 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5',
   instagramConnected: true,
   googleSheetsConnected: true,
   geminiConnected: true,

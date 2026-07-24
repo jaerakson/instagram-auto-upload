@@ -24,8 +24,8 @@ import {
   Save,
   Download,
 } from 'lucide-react';
-import type { CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
-import { IMAGE_QUALITY_COSTS } from '@/types';
+import type { CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, SubjectPreset, PipelineStep, TrendResult, ImageResult, CaptionResult, UploadResult } from '@/types';
+import { IMAGE_QUALITY_COSTS, DEFAULT_SUBJECT_PROMPTS } from '@/types';
 import { cn } from '@/lib/utils';
 
 const LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
@@ -52,6 +52,16 @@ const STYLE_PRESET_OPTIONS: { value: StylePreset; labelKey: string }[] = [
   { value: 'watercolor', labelKey: 'styleWatercolor' },
   { value: '3d_render', labelKey: 'style3dRender' },
   { value: 'pop_art', labelKey: 'stylePopArt' },
+];
+
+const SUBJECT_PRESET_OPTIONS: { value: SubjectPreset; labelKey: string }[] = [
+  { value: 'woman', labelKey: 'subjectWoman' },
+  { value: 'man', labelKey: 'subjectMan' },
+  { value: 'cat', labelKey: 'subjectCat' },
+  { value: 'dog', labelKey: 'subjectDog' },
+  { value: 'landscape', labelKey: 'subjectLandscape' },
+  { value: 'food', labelKey: 'subjectFood' },
+  { value: 'custom', labelKey: 'subjectCustom' },
 ];
 
 const steps = [
@@ -103,8 +113,14 @@ export default function CreatePage() {
   const [savingProgress, setSavingProgress] = useState(false);
   const [savedProgress, setSavedProgress] = useState(false);
   const [pendingJob, setPendingJob] = useState<any>(null);
+  const [retryOriginalId, setRetryOriginalId] = useState<string | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
   const [imageQuality, setImageQuality] = useState<ImageQuality>('standard');
+  const [captionLength, setCaptionLength] = useState(150);
+  const [subjectPreset, setSubjectPreset] = useState<SubjectPreset>('woman');
+  const [subjectCustom, setSubjectCustom] = useState('');
+  const [geminiKeyUsed, setGeminiKeyUsed] = useState<number | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [driveAutoSave, setDriveAutoSave] = useState(false);
   const [driveFolderId, setDriveFolderId] = useState('');
   const [driveSaveStatus, setDriveSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
@@ -130,6 +146,9 @@ export default function CreatePage() {
           if (s.trendPreset) setTrendPreset(s.trendPreset);
           if (s.captionLanguage) setCaptionLang(s.captionLanguage);
           if (s.imageQuality) setImageQuality(s.imageQuality);
+          if (s.captionLength) setCaptionLength(s.captionLength);
+          if (s.subjectPreset) setSubjectPreset(s.subjectPreset);
+          if (s.subjectCustom) setSubjectCustom(s.subjectCustom);
           if (s.googleDriveAutoSave) setDriveAutoSave(true);
           if (s.googleDriveFolderId) setDriveFolderId(s.googleDriveFolderId);
         }
@@ -142,6 +161,7 @@ export default function CreatePage() {
         try {
           const job = JSON.parse(retryData);
           setPendingJob(job);
+          if (job.id) setRetryOriginalId(job.id);
           setShowResumeBanner(true);
           return; // skip pending job check since we have retry data
         } catch { /* ignore */ }
@@ -176,6 +196,8 @@ export default function CreatePage() {
     setTotalTokens(0);
     setTotalCost(0);
     setJobId(null);
+    setRetryOriginalId(null);
+    setGeminiKeyUsed(null);
   }
 
   function handleCancel() {
@@ -205,7 +227,7 @@ export default function CreatePage() {
       const res = await fetch('/api/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stylePreset }),
+        body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Prompt generation failed');
@@ -214,8 +236,9 @@ export default function CreatePage() {
       if (json.data.trendReport) setTrendReport(json.data.trendReport);
 
       // Track cost from trend analysis
-      if (json.data.totalTokens) setTotalTokens(prev => prev + json.data.totalTokens);
-      if (json.data.totalCost) setTotalCost(prev => prev + json.data.totalCost);
+      if (json.data.totalTokens != null) setTotalTokens(prev => prev + json.data.totalTokens);
+      if (json.data.totalCost != null) setTotalCost(prev => prev + json.data.totalCost);
+      if (json.data.geminiKeyUsed) setGeminiKeyUsed(json.data.geminiKeyUsed);
 
       // Auto-complete trend step so image button becomes active
       const trendResult: TrendResult = {
@@ -249,10 +272,11 @@ export default function CreatePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: prompt.trim() || 'Instagram post',
           style,
           language: captionLang,
           mode,
+          captionLength,
         }),
       });
       const json = await res.json();
@@ -266,8 +290,9 @@ export default function CreatePage() {
       }
 
       // Track cost from caption generation
-      if (json.data.totalTokens) setTotalTokens(prev => prev + json.data.totalTokens);
-      if (json.data.totalCost) setTotalCost(prev => prev + json.data.totalCost);
+      if (json.data.geminiKeyUsed) setGeminiKeyUsed(json.data.geminiKeyUsed);
+      if (json.data.totalTokens != null) setTotalTokens(prev => prev + json.data.totalTokens);
+      if (json.data.totalCost != null) setTotalCost(prev => prev + json.data.totalCost);
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Failed to generate caption');
     } finally {
@@ -303,84 +328,98 @@ export default function CreatePage() {
         }
       }
 
-      // Step 1: Trend analysis + prompt generation
-      setGeneratingPrompt(true);
-      const promptRes = await fetch('/api/generate-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stylePreset }),
-        signal,
-      });
-      const promptJson = await promptRes.json();
-      if (!promptJson.success) throw new Error(promptJson.error || 'Prompt generation failed');
+      let generatedPrompt = prompt;
+      let generatedStyle = style;
+      let generatedTrendReport = trendReport;
+      let runTokens = totalTokens;
+      let runCost = totalCost;
 
-      const generatedPrompt = promptJson.data.prompt;
-      const generatedStyle = promptJson.data.style;
-      const generatedTrendReport = promptJson.data.trendReport || '';
-      let runTokens = promptJson.data.totalTokens || 0;
-      let runCost = promptJson.data.totalCost || 0;
-      setTotalTokens(runTokens);
-      setTotalCost(runCost);
+      // Step 1: Trend analysis + prompt generation (skip if already done)
+      if (pipeline[0].status !== 'complete') {
+        setGeneratingPrompt(true);
+        const promptRes = await fetch('/api/generate-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom }),
+          signal,
+        });
+        const promptJson = await promptRes.json();
+        if (!promptJson.success) throw new Error(promptJson.error || 'Prompt generation failed');
 
-      setPrompt(generatedPrompt);
-      setStyle(generatedStyle);
-      if (generatedTrendReport) setTrendReport(generatedTrendReport);
+        generatedPrompt = promptJson.data.prompt;
+        generatedStyle = promptJson.data.style;
+        generatedTrendReport = promptJson.data.trendReport || '';
+        runTokens = promptJson.data.totalTokens || 0;
+        runCost = promptJson.data.totalCost || 0;
+        setTotalTokens(runTokens);
+        setTotalCost(runCost);
+        if (promptJson.data.geminiKeyUsed) setGeminiKeyUsed(promptJson.data.geminiKeyUsed);
 
-      const trendResult: TrendResult = {
-        summary: generatedTrendReport || `Style: ${generatedStyle}`,
-        topStyles: generatedStyle ? generatedStyle.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-        keywords: generatedPrompt.split(' ').filter((w: string) => w.length > 3),
-        hashtags: ['#AIart', '#AIgenerated'],
-        avoidList: [],
-      };
-      setPipeline((prev) => {
-        const next = [...prev];
-        next[0] = { step: 'trend', status: 'complete', result: trendResult };
-        return next;
-      });
-      setGeneratingPrompt(false);
+        setPrompt(generatedPrompt);
+        setStyle(generatedStyle);
+        if (generatedTrendReport) setTrendReport(generatedTrendReport);
+
+        const trendResult: TrendResult = {
+          summary: generatedTrendReport || `Style: ${generatedStyle}`,
+          topStyles: generatedStyle ? generatedStyle.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+          keywords: generatedPrompt.split(' ').filter((w: string) => w.length > 3),
+          hashtags: ['#AIart', '#AIgenerated'],
+          avoidList: [],
+        };
+        setPipeline((prev) => {
+          const next = [...prev];
+          next[0] = { step: 'trend', status: 'complete', result: trendResult };
+          return next;
+        });
+        setGeneratingPrompt(false);
+
+        if (currentJobId) {
+          await fetch('/api/pipeline/job', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport, mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
+            signal,
+          });
+        }
+      }
       setAutoProgress(25);
       setAutoStepLabel(t(mediaType === 'reels' ? 'step2Reels' : 'step2'));
 
-      if (currentJobId) {
-        await fetch('/api/pipeline/job', {
-          method: 'PUT',
+      // Step 2: Image generation (skip if already done)
+      let imageResult: ImageResult;
+      if (pipeline[1].status === 'complete' && pipeline[1].result) {
+        imageResult = pipeline[1].result as ImageResult;
+      } else {
+        setPipeline((prev) => {
+          const next = [...prev];
+          next[1] = { ...next[1], status: 'running', error: undefined };
+          return next;
+        });
+        const imgRes = await fetch('/api/generate', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 1, prompt: generatedPrompt, style: generatedStyle, trendReport: generatedTrendReport, mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
+          body: JSON.stringify({
+            prompt: generatedPrompt.trim(),
+            aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
+            type: mediaType,
+            quality: imageQuality,
+          }),
           signal,
         });
-      }
-
-      // Step 2: Image generation
-      setPipeline((prev) => {
-        const next = [...prev];
-        next[1] = { ...next[1], status: 'running', error: undefined };
-        return next;
-      });
-      const imgRes = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        const imgJson = await imgRes.json();
+        if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
+        const imageCost = mediaType === 'reels' ? 2.80 : IMAGE_QUALITY_COSTS[imageQuality];
+        runCost += imageCost;
+        setTotalCost(runCost);
+        imageResult = {
+          imageUrl: imgJson.data.imageUrl || imgJson.data.videoUrl || '',
           prompt: generatedPrompt.trim(),
-          aspectRatio: mediaType === 'reels' ? '9:16' : '1:1',
-          type: mediaType,
-          quality: imageQuality,
-        }),
-        signal,
-      });
-      const imgJson = await imgRes.json();
-      if (!imgJson.success) throw new Error(imgJson.error || 'Image generation failed');
-      const imageCost = mediaType === 'reels' ? 2.80 : IMAGE_QUALITY_COSTS[imageQuality];
-      runCost += imageCost;
-      setTotalCost(runCost);
-      const imageResult: ImageResult = {
-        imageUrl: imgJson.data.imageUrl || imgJson.data.videoUrl || '',
-        prompt: generatedPrompt.trim(),
-        designIntent: generatedStyle || '',
-        model: mediaType === 'reels' ? 'veo-3.1-generate-preview' : (imageQuality === 'ultra' ? 'imagen-4.0-ultra-generate-001' : 'imagen-4.0-generate-001'),
-        imageSize: mediaType === 'reels' ? '9:16' : '1:1',
-        mediaType,
-      };
+          designIntent: generatedStyle || '',
+          model: mediaType === 'reels' ? 'veo-3.1-generate-preview' : (imageQuality === 'ultra' ? 'imagen-4.0-ultra-generate-001' : 'imagen-4.0-generate-001'),
+          imageSize: mediaType === 'reels' ? '9:16' : '1:1',
+          mediaType,
+        };
+      }
       setPipeline((prev) => {
         const next = [...prev];
         next[1] = { step: 'image', status: 'complete', result: imageResult };
@@ -411,43 +450,48 @@ export default function CreatePage() {
           .catch(() => setDriveSaveStatus('failed'));
       }
 
-      // Step 3: Caption generation
+      // Step 3: Caption generation (skip if already done)
+      let generatedCaption = editCaption;
+      let generatedHashtags = editHashtags;
       setAutoProgress(50);
       setAutoStepLabel(t('step3'));
-      setPipeline((prev) => {
-        const next = [...prev];
-        next[2] = { ...next[2], status: 'running', error: undefined };
-        return next;
-      });
-      const capRes = await fetch('/api/generate-caption', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: generatedPrompt.trim(),
-          style: generatedStyle,
-          language: captionLang,
-          mode: 'full',
-        }),
-        signal,
-      });
-      const capJson = await capRes.json();
-      if (!capJson.success) throw new Error(capJson.error || 'Caption generation failed');
 
-      runTokens += capJson.data.totalTokens || 0;
-      runCost += capJson.data.totalCost || 0;
-      setTotalTokens(runTokens);
-      setTotalCost(runCost);
-      const generatedCaption = capJson.data.caption;
-      const generatedHashtags = capJson.data.hashtags;
-      setEditCaption(generatedCaption);
-      setEditHashtags(generatedHashtags);
+      if (pipeline[2].status !== 'complete' || !editCaption) {
+        setPipeline((prev) => {
+          const next = [...prev];
+          next[2] = { ...next[2], status: 'running', error: undefined };
+          return next;
+        });
+        const capRes = await fetch('/api/generate-caption', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: generatedPrompt.trim() || 'Instagram post',
+            style: generatedStyle,
+            language: captionLang,
+            mode: 'full',
+            captionLength,
+          }),
+          signal,
+        });
+        const capJson = await capRes.json();
+        if (!capJson.success) throw new Error(capJson.error || 'Caption generation failed');
 
-      // Auto-confirm caption
+        runTokens += capJson.data.totalTokens || 0;
+        runCost += capJson.data.totalCost || 0;
+        setTotalTokens(runTokens);
+        setTotalCost(runCost);
+        generatedCaption = capJson.data.caption;
+        generatedHashtags = capJson.data.hashtags;
+        setEditCaption(generatedCaption);
+        setEditHashtags(generatedHashtags);
+      }
+
       const captionResult: CaptionResult = {
         caption: generatedCaption,
         hashtags: generatedHashtags,
         fullText: `${generatedCaption}\n\n${generatedHashtags}`.trim(),
-        strategy: 'confirmed',
+        strategy: pipeline[2].status === 'complete' ? 'manual' : 'confirmed',
       };
       setPipeline((prev) => {
         const next = [...prev];
@@ -497,7 +541,7 @@ export default function CreatePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: crypto.randomUUID(),
+          id: retryOriginalId || crypto.randomUUID(),
           date: new Date().toISOString(),
           prompt: generatedPrompt.trim(),
           caption: generatedCaption,
@@ -780,7 +824,7 @@ export default function CreatePage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              id: crypto.randomUUID(),
+              id: retryOriginalId || crypto.randomUUID(),
               date: new Date().toISOString(),
               prompt: prompt.trim(),
               caption: editCaption,
@@ -791,6 +835,8 @@ export default function CreatePage() {
               status: 'published',
               trendReport: trendReport || '',
               style: style || '',
+              totalTokens,
+              totalCost,
             }),
           });
           setPipeline((prev) => {
@@ -907,6 +953,18 @@ export default function CreatePage() {
           </select>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">{t('subjectPresetLabel')}</label>
+          <select
+            value={subjectPreset}
+            onChange={(e) => setSubjectPreset(e.target.value as SubjectPreset)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {SUBJECT_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <label className="text-xs text-slate-500">{t('imageQuality')}</label>
           <select
             value={imageQuality}
@@ -971,6 +1029,7 @@ export default function CreatePage() {
           )}
           {(totalTokens > 0 || totalCost > 0) && (
             <div className="flex items-center gap-4 text-xs text-slate-500">
+              {geminiKeyUsed && <span>Key: <span className="text-purple-400 font-mono">#{geminiKeyUsed}</span></span>}
               <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
               <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
               <span>{t('estimatedImageCost')}: <span className="text-blue-400 font-mono">${mediaType === 'reels' ? '2.80' : IMAGE_QUALITY_COSTS[imageQuality].toFixed(2)}</span></span>
@@ -1117,6 +1176,62 @@ export default function CreatePage() {
                 </CardContent>
               )}
 
+              {/* Step 2: Direct file upload (idle/error state) */}
+              {step === 'image' && (pipelineStep.status === 'idle' || pipelineStep.status === 'error') && (
+                <CardContent className="border-t border-slate-800 pt-4">
+                  <p className="text-xs text-slate-500 mb-2">{t('directUploadHint')}</p>
+                  <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-700 bg-slate-950 p-6 cursor-pointer hover:border-purple-500/50 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      disabled={uploadingFile || autoAllRunning}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingFile(true);
+                        setErrorMsg('');
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          const res = await fetch('/api/upload-media', { method: 'POST', body: formData });
+                          const json = await res.json();
+                          if (!json.success) throw new Error(json.error || 'Upload failed');
+                          const isVideo = file.type.startsWith('video/');
+                          if (isVideo) setMediaType('reels');
+                          const imageResult: ImageResult = {
+                            imageUrl: json.data.url,
+                            prompt: prompt.trim() || t('directUpload'),
+                            designIntent: style || '',
+                            model: 'manual-upload',
+                            imageSize: isVideo ? '9:16' : '1:1',
+                            mediaType: isVideo ? 'reels' : 'image',
+                          };
+                          setPipeline((prev) => {
+                            const next = [...prev];
+                            if (next[0].status === 'idle') {
+                              next[0] = { step: 'trend', status: 'complete', result: { summary: t('directUpload'), topStyles: [], keywords: [], hashtags: [], avoidList: [] } };
+                            }
+                            next[1] = { step: 'image', status: 'complete', result: imageResult };
+                            return next;
+                          });
+                        } catch (error) {
+                          setErrorMsg(error instanceof Error ? error.message : 'Upload failed');
+                        } finally {
+                          setUploadingFile(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                    {uploadingFile ? (
+                      <><Loader2 className="h-5 w-5 animate-spin text-slate-400" /><span className="text-sm text-slate-400">{t('uploading')}</span></>
+                    ) : (
+                      <><Upload className="h-5 w-5 text-slate-500" /><span className="text-sm text-slate-400">{t('selectFile')}</span></>
+                    )}
+                  </label>
+                </CardContent>
+              )}
+
               {/* Step 2: Image result with preview */}
               {step === 'image' && pipelineStep.status === 'complete' && pipelineStep.result && (
                 <CardContent className="border-t border-slate-800 pt-4">
@@ -1134,20 +1249,77 @@ export default function CreatePage() {
                     <Badge variant="outline" className="border-slate-600 text-slate-400 text-xs">
                       {t(mediaType === 'reels' ? 'mediaReels' : 'mediaImage')}
                     </Badge>
+                    <div className="ml-auto flex items-center gap-2">
+                      <label className="text-xs text-slate-500">{t('captionLengthLabel')}</label>
+                      <input
+                        type="range"
+                        min={50}
+                        max={500}
+                        step={10}
+                        value={captionLength}
+                        onChange={(e) => setCaptionLength(Number(e.target.value))}
+                        className="w-24 accent-purple-500"
+                      />
+                      <span className="text-xs font-mono text-slate-300 w-10 text-right">{captionLength}{t('chars')}</span>
+                      <div className="flex gap-0.5">
+                        {[{ l: t('captionShort'), v: 80 }, { l: t('captionNormal'), v: 150 }, { l: t('captionLong'), v: 300 }].map((p) => (
+                          <button key={p.v} onClick={() => setCaptionLength(p.v)} className={cn('rounded px-1.5 py-0.5 text-[10px]', captionLength === p.v ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300')}>
+                            {p.l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <CaptionEditor
-                    caption={editCaption}
-                    hashtags={editHashtags}
-                    captionLang={captionLang}
-                    onCaptionChange={setEditCaption}
-                    onHashtagsChange={setEditHashtags}
-                    onLanguageChange={setCaptionLang}
-                    onGenerateCaption={handleGenerateCaption}
-                    generatingCaption={generatingCaption}
-                    regeneratingCaption={regeneratingCaption}
-                    regeneratingHashtags={regeneratingHashtags}
-                    hasPrompt={prompt.trim().length > 0}
-                  />
+                  {!editCaption && !editHashtags ? (
+                    <div className="space-y-3">
+                      <CaptionEditor
+                        caption={editCaption}
+                        hashtags={editHashtags}
+                        captionLang={captionLang}
+                        onCaptionChange={setEditCaption}
+                        onHashtagsChange={setEditHashtags}
+                        onLanguageChange={setCaptionLang}
+                        onGenerateCaption={handleGenerateCaption}
+                        generatingCaption={generatingCaption}
+                        regeneratingCaption={regeneratingCaption}
+                        regeneratingHashtags={regeneratingHashtags}
+                        hasPrompt={prompt.trim().length > 0}
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-600">또는</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditCaption('');
+                            setEditHashtags('');
+                            setPipeline((prev) => {
+                              const next = [...prev];
+                              next[2] = { step: 'caption', status: 'complete', result: { caption: '', hashtags: '', fullText: '', strategy: 'manual' } };
+                              return next;
+                            });
+                          }}
+                          className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                        >
+                          {t('manualCaption')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <CaptionEditor
+                      caption={editCaption}
+                      hashtags={editHashtags}
+                      captionLang={captionLang}
+                      onCaptionChange={setEditCaption}
+                      onHashtagsChange={setEditHashtags}
+                      onLanguageChange={setCaptionLang}
+                      onGenerateCaption={handleGenerateCaption}
+                      generatingCaption={generatingCaption}
+                      regeneratingCaption={regeneratingCaption}
+                      regeneratingHashtags={regeneratingHashtags}
+                      hasPrompt={prompt.trim().length > 0}
+                    />
+                  )}
                 </CardContent>
               )}
 
@@ -1267,14 +1439,20 @@ function ImageResultView({ result }: { result: ImageResult }) {
               playsInline
               className="h-64 w-auto max-w-xs object-cover"
             />
-          ) : (
+          ) : result.imageUrl ? (
             <img
               src={result.imageUrl}
               alt="Generated"
               className="h-64 w-64 object-cover"
               width={256}
               height={256}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.innerHTML = '<div class="flex h-64 w-64 items-center justify-center bg-slate-800 text-slate-500 text-xs">Image expired</div>';
+              }}
             />
+          ) : (
+            <div className="flex h-64 w-64 items-center justify-center bg-slate-800 text-slate-500 text-sm">No image</div>
           )}
         </div>
         <Button

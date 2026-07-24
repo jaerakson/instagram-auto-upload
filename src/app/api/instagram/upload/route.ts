@@ -13,6 +13,28 @@ export async function POST(request: Request) {
     }
     const instagramService = await getInstagramService();
 
+    // 중복 게시물 체크: 최근 게시물 중 같은 캡션이 있으면 재업로드 방지
+    try {
+      const recentMedia = await instagramService.getRecentMedia(5);
+      const captionStart = caption.substring(0, 50);
+      const alreadyPosted = recentMedia.find(m =>
+        m.caption?.startsWith(captionStart),
+      );
+      if (alreadyPosted) {
+        return NextResponse.json<ApiResponse<{ mediaId: string; mediaUrl: string; imageUrl: string; duplicate: boolean }>>({
+          success: true,
+          data: {
+            mediaId: alreadyPosted.id,
+            mediaUrl: alreadyPosted.permalink || '',
+            imageUrl: alreadyPosted.mediaUrl || '',
+            duplicate: true,
+          },
+        });
+      }
+    } catch {
+      // 중복 체크 실패 시 무시하고 업로드 진행
+    }
+
     if (mediaType === 'reels' && videoUrl) {
       const result = await instagramService.uploadReels(videoUrl, caption);
       return NextResponse.json<ApiResponse<{ mediaId: string; mediaUrl: string; imageUrl: string }>>({ success: true, data: result });

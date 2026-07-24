@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Camera, FileSpreadsheet, Cpu, Check, Trash2, Key, Eye, EyeOff, HelpCircle, RotateCcw } from 'lucide-react';
-import type { AppSettings, CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, CredentialKey, CredentialStatus } from '@/types';
-import { DEFAULT_STYLE_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT, IMAGE_QUALITY_COSTS } from '@/types';
+import type { AppSettings, CaptionLanguage, MediaType, StylePreset, TrendPreset, ImageQuality, SubjectPreset, CredentialKey, CredentialStatus } from '@/types';
+import { DEFAULT_STYLE_PROMPTS, DEFAULT_SUBJECT_PROMPTS, DEFAULT_TREND_PROMPT, DEFAULT_TREND_KEYWORDS, DEFAULT_GENERATE_PROMPT, IMAGE_QUALITY_COSTS } from '@/types';
 
 const TREND_PRESET_OPTIONS: { value: TrendPreset; labelKey: string }[] = [
   { value: 'portrait', labelKey: 'trendPortrait' },
@@ -27,6 +27,16 @@ interface KeyConfig {
   icon: typeof Camera;
   color: string;
 }
+
+const SUBJECT_PRESET_OPTIONS: { value: SubjectPreset; labelKey: string }[] = [
+  { value: 'woman', labelKey: 'subjectWoman' },
+  { value: 'man', labelKey: 'subjectMan' },
+  { value: 'cat', labelKey: 'subjectCat' },
+  { value: 'dog', labelKey: 'subjectDog' },
+  { value: 'landscape', labelKey: 'subjectLandscape' },
+  { value: 'food', labelKey: 'subjectFood' },
+  { value: 'custom', labelKey: 'subjectCustom' },
+];
 
 const CAPTION_LANGUAGE_OPTIONS: { value: CaptionLanguage; labelKey: string }[] = [
   { value: 'ko', labelKey: 'langKo' },
@@ -58,10 +68,14 @@ const defaultSettings: AppSettings = {
   generatePrompt: DEFAULT_GENERATE_PROMPT,
   mediaType: 'image' as const,
   stylePreset: 'photorealistic' as const,
+  subjectPreset: 'woman' as const,
+  subjectCustom: '',
   stylePrompts: { ...DEFAULT_STYLE_PROMPTS },
   imageQuality: 'standard' as const,
+  captionLength: 150,
   googleDriveAutoSave: false,
   googleDriveFolderId: '',
+  geminiKeyOrder: 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5',
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -80,21 +94,39 @@ export default function SettingsPage() {
     INSTAGRAM_ACCESS_TOKEN: '',
     INSTAGRAM_USER_ID: '',
     GEMINI_KEY: '',
+    GEMINI_KEY_2: '',
+    GEMINI_KEY_3: '',
+    GEMINI_KEY_4: '',
+    GEMINI_KEY_5: '',
   });
   const [showKey, setShowKey] = useState<Record<CredentialKey, boolean>>({
     INSTAGRAM_ACCESS_TOKEN: false,
     INSTAGRAM_USER_ID: false,
     GEMINI_KEY: false,
+    GEMINI_KEY_2: false,
+    GEMINI_KEY_3: false,
+    GEMINI_KEY_4: false,
+    GEMINI_KEY_5: false,
   });
   const [savingKey, setSavingKey] = useState<CredentialKey | null>(null);
   const [savedKey, setSavedKey] = useState<CredentialKey | null>(null);
   const [saveError, setSaveError] = useState<CredentialKey | null>(null);
 
-  const keyConfigs: KeyConfig[] = [
+  const instaKeyConfigs: KeyConfig[] = [
     { key: 'INSTAGRAM_ACCESS_TOKEN', label: t('instagramToken'), icon: Camera, color: 'from-purple-500 to-pink-500' },
     { key: 'INSTAGRAM_USER_ID', label: t('instagramUserId'), icon: Camera, color: 'from-purple-500 to-pink-500' },
-    { key: 'GEMINI_KEY', label: t('geminiApiKey'), icon: Cpu, color: 'from-blue-500 to-indigo-600' },
   ];
+
+  const GEMINI_KEY_SLOTS: CredentialKey[] = ['GEMINI_KEY', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_4', 'GEMINI_KEY_5'];
+  const [geminiKeyOrder, setGeminiKeyOrder] = useState<CredentialKey[]>(GEMINI_KEY_SLOTS);
+
+  function moveGeminiKey(index: number, direction: 'up' | 'down') {
+    const newOrder = [...geminiKeyOrder];
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= newOrder.length) return;
+    [newOrder[index], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[index]];
+    setGeminiKeyOrder(newOrder);
+  }
 
   useEffect(() => {
     async function init() {
@@ -104,6 +136,9 @@ export default function SettingsPage() {
         const json = await res.json();
         if (json.success && json.data) {
           setSettings((prev) => ({ ...prev, ...json.data, language: currentLocale }));
+          if (json.data.geminiKeyOrder) {
+            setGeminiKeyOrder(json.data.geminiKeyOrder.split(',').filter(Boolean) as CredentialKey[]);
+          }
         }
       } catch {
         // use defaults
@@ -215,7 +250,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/sheets/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, language: currentLocale }),
+        body: JSON.stringify({ ...settings, language: currentLocale, geminiKeyOrder: geminiKeyOrder.join(',') }),
       });
       if (res.ok) {
         setSaved(true);
@@ -258,151 +293,128 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Upload Time & Caption Language — visible only when autoMode is ON */}
+      {/* Basic Settings — compact grid */}
       {settings.autoMode && (
         <>
           <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5">
-              <Label htmlFor="postTime" className="mb-2 block text-sm text-white">
-                {t('postTime')} <span className="text-slate-500 font-normal">(KST)</span>
-              </Label>
-              <Input
-                id="postTime"
-                type="time"
-                value={settings.postTime}
-                onChange={(e) => update('postTime', e.target.value)}
-                className="w-40 border-slate-700 bg-slate-950 text-slate-200"
-              />
-              <p className="mt-2 text-xs text-slate-500">{t('postTimeDesc')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5">
-              <Label htmlFor="captionLanguage" className="mb-2 block text-sm text-white">
-                {t('captionLanguage')}
-              </Label>
-              <select
-                id="captionLanguage"
-                value={settings.captionLanguage}
-                onChange={(e) => update('captionLanguage', e.target.value as CaptionLanguage)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
-              >
-                {CAPTION_LANGUAGE_OPTIONS.map(({ value, labelKey }) => (
-                  <option key={value} value={value}>
-                    {t(labelKey)}
-                  </option>
-                ))}
-              </select>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5">
-              <Label className="mb-3 block text-sm text-white">
-                {t('mediaType')}
-              </Label>
-              <div className="flex gap-1 rounded-lg bg-slate-800 p-0.5 w-fit">
-                {(['image', 'reels'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => update('mediaType', type)}
-                    className={cn(
-                      'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
-                      settings.mediaType === type
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    )}
-                  >
-                    {t(type === 'image' ? 'mediaImage' : 'mediaReels')}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">{t('mediaTypeDesc')}</p>
-            </CardContent>
-          </Card>
-
-          {/* Image Quality */}
-          <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5">
-              <Label className="mb-3 block text-sm text-white">
-                {t('imageQuality')}
-              </Label>
-              <select
-                value={settings.imageQuality}
-                onChange={(e) => update('imageQuality', e.target.value as ImageQuality)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none"
-              >
-                <option value="standard">{t('qualityStandard')}</option>
-                <option value="ultra">{t('qualityUltra')}</option>
-              </select>
-              <p className="mt-2 text-xs text-slate-500">{t('imageQualityDesc')}</p>
-            </CardContent>
-          </Card>
-
-          {/* Google Drive Auto Save */}
-          <Card className={cn("border-slate-800 bg-slate-900", settings.googleDriveAutoSave && "border-blue-500/50")}>
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-white">{t('googleDriveAutoSave')}</p>
-                  <p className="text-xs text-slate-400">{t('googleDriveAutoSaveDesc')}</p>
-                </div>
-                <Switch
-                  checked={settings.googleDriveAutoSave}
-                  onCheckedChange={(checked) => update('googleDriveAutoSave', checked)}
-                />
-              </div>
-              {settings.googleDriveAutoSave && (
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-white">{t('basicSettings')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {/* Post Time */}
                 <div>
-                  <Label className="mb-1.5 block text-xs text-slate-500">{t('googleDriveFolderId')}</Label>
-                  <Input
-                    value={settings.googleDriveFolderId}
-                    onChange={(e) => update('googleDriveFolderId', e.target.value)}
-                    placeholder={t('googleDriveFolderIdPlaceholder')}
-                    className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
-                  />
+                  <label className="group relative mb-1.5 flex items-center gap-1 text-xs text-slate-400">
+                    {t('postTime')} (KST)
+                    <HelpCircle className="h-3 w-3 text-slate-600" />
+                    <span className="invisible group-hover:visible absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{t('postTimeDesc')}</span>
+                  </label>
+                  <Input type="time" value={settings.postTime} onChange={(e) => update('postTime', e.target.value)} className="h-8 border-slate-700 bg-slate-950 text-sm text-slate-200" />
                 </div>
-              )}
+                {/* Caption Language */}
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-400">{t('captionLanguage')}</label>
+                  <select value={settings.captionLanguage} onChange={(e) => update('captionLanguage', e.target.value as CaptionLanguage)} className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none">
+                    {CAPTION_LANGUAGE_OPTIONS.map(({ value, labelKey }) => (<option key={value} value={value}>{t(labelKey)}</option>))}
+                  </select>
+                </div>
+                {/* Media Type */}
+                <div>
+                  <label className="group relative mb-1.5 flex items-center gap-1 text-xs text-slate-400">
+                    {t('mediaType')}
+                    <HelpCircle className="h-3 w-3 text-slate-600" />
+                    <span className="invisible group-hover:visible absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{t('mediaTypeDesc')}</span>
+                  </label>
+                  <div className="flex gap-0.5 rounded-md bg-slate-800 p-0.5">
+                    {(['image', 'reels'] as const).map((type) => (
+                      <button key={type} onClick={() => update('mediaType', type)} className={cn('flex-1 rounded px-2 py-1 text-xs font-medium transition-colors', settings.mediaType === type ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-slate-200')}>
+                        {t(type === 'image' ? 'mediaImage' : 'mediaReels')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Image Quality */}
+                <div>
+                  <label className="group relative mb-1.5 flex items-center gap-1 text-xs text-slate-400">
+                    {t('imageQuality')}
+                    <HelpCircle className="h-3 w-3 text-slate-600" />
+                    <span className="invisible group-hover:visible absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{t('imageQualityDesc')}</span>
+                  </label>
+                  <select value={settings.imageQuality} onChange={(e) => update('imageQuality', e.target.value as ImageQuality)} className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none">
+                    <option value="standard">{t('qualityStandard')}</option>
+                    <option value="ultra">{t('qualityUltra')}</option>
+                  </select>
+                </div>
+                {/* Caption Length */}
+                <div className="col-span-2">
+                  <label className="group relative mb-1.5 flex items-center gap-1 text-xs text-slate-400">
+                    {t('captionLength')} <span className="font-mono text-slate-300">{settings.captionLength || 150}{t('captionLengthUnit')}</span>
+                    <HelpCircle className="h-3 w-3 text-slate-600" />
+                    <span className="invisible group-hover:visible absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-slate-300 whitespace-nowrap z-50 shadow-lg">{t('captionLengthDesc')}</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input type="range" min={50} max={500} step={10} value={settings.captionLength || 150} onChange={(e) => update('captionLength', Number(e.target.value))} className="flex-1 accent-purple-500" />
+                    <div className="flex gap-1">
+                      {[{ l: t('captionShort'), v: 80 }, { l: t('captionNormal'), v: 150 }, { l: t('captionLong'), v: 300 }].map((p) => (
+                        <button key={p.v} onClick={() => update('captionLength', p.v)} className={cn('rounded px-1.5 py-0.5 text-[10px]', (settings.captionLength || 150) === p.v ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-500')}>{p.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Google Drive */}
+              <div className="flex items-center justify-between border-t border-slate-800 pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">{t('googleDriveAutoSave')}</span>
+                  <Switch checked={settings.googleDriveAutoSave} onCheckedChange={(checked) => update('googleDriveAutoSave', checked)} />
+                </div>
+                {settings.googleDriveAutoSave && (
+                  <Input value={settings.googleDriveFolderId} onChange={(e) => update('googleDriveFolderId', e.target.value)} placeholder={t('googleDriveFolderIdPlaceholder')} className="ml-3 flex-1 h-7 border-slate-700 bg-slate-950 text-xs text-slate-200 placeholder:text-slate-600" />
+                )}
+              </div>
             </CardContent>
           </Card>
 
+          {/* Style & Subject */}
           <Card className="border-slate-800 bg-slate-900">
-            <CardContent className="p-5 space-y-4">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <Label className="text-sm text-white">{t('stylePreset')}</Label>
-                <button
-                  onClick={() => update('stylePrompts', { ...DEFAULT_STYLE_PROMPTS })}
-                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  {t('resetDefaults')}
+                <CardTitle className="text-sm text-white">{t('styleSettings')}</CardTitle>
+                <button onClick={() => update('stylePrompts', { ...DEFAULT_STYLE_PROMPTS })} className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors">
+                  <RotateCcw className="h-3 w-3" />{t('resetDefaults')}
                 </button>
               </div>
-              <select
-                value={settings.stylePreset}
-                onChange={(e) => update('stylePreset', e.target.value as StylePreset)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none w-full"
-              >
-                {STYLE_PRESET_OPTIONS.map(({ value, labelKey }) => (
-                  <option key={value} value={value}>
-                    {t(labelKey)}
-                  </option>
-                ))}
-              </select>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-400">{t('stylePreset')}</label>
+                  <select value={settings.stylePreset} onChange={(e) => update('stylePreset', e.target.value as StylePreset)} className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none">
+                    {STYLE_PRESET_OPTIONS.map(({ value, labelKey }) => (<option key={value} value={value}>{t(labelKey)}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-400">{t('subjectPresetLabel')}</label>
+                  <select value={settings.subjectPreset} onChange={(e) => update('subjectPreset', e.target.value as SubjectPreset)} className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-slate-200 focus:border-purple-500 focus:outline-none">
+                    {SUBJECT_PRESET_OPTIONS.map(({ value, labelKey }) => (<option key={value} value={value}>{t(labelKey)}</option>))}
+                  </select>
+                </div>
+              </div>
+              {settings.subjectPreset === 'custom' && (
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-500">{t('subjectCustomInput')}</label>
+                  <Input value={settings.subjectCustom} onChange={(e) => update('subjectCustom', e.target.value)} placeholder="e.g. baby elephant, sports car..." className="border-slate-700 bg-slate-950 text-sm text-slate-200 placeholder:text-slate-600" />
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-xs text-slate-500">{t('stylePromptLabel')}</label>
                 <textarea
                   value={settings.stylePrompts?.[settings.stylePreset] || DEFAULT_STYLE_PROMPTS[settings.stylePreset] || ''}
-                  onChange={(e) => {
-                    const updated = { ...(settings.stylePrompts || {}), [settings.stylePreset]: e.target.value };
-                    update('stylePrompts', updated);
-                  }}
+                  onChange={(e) => { const updated = { ...(settings.stylePrompts || {}), [settings.stylePreset]: e.target.value }; update('stylePrompts', updated); }}
                   rows={2}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 font-mono focus:border-purple-500 focus:outline-none"
                 />
               </div>
-              <p className="text-xs text-slate-500">{t('stylePresetDesc')}</p>
             </CardContent>
           </Card>
 
@@ -485,7 +497,8 @@ export default function SettingsPage() {
           <p className="text-xs text-slate-400">{t('apiKeysDesc')}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {keyConfigs.map(({ key, label, icon: Icon, color }) => (
+          {/* Instagram Keys */}
+          {instaKeyConfigs.map(({ key, label, icon: Icon, color }) => (
             <div
               key={key}
               className="rounded-lg border border-slate-800 bg-slate-950 p-4"
@@ -556,6 +569,51 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
+
+          {/* Gemini Keys with Priority */}
+          <div className="border-t border-slate-800 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium text-slate-200">{t('geminiApiKey')} ({t('geminiKeyPriority')})</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {geminiKeyOrder.map((slot, idx) => (
+                <div key={slot} className="flex items-center gap-2">
+                  <span className="w-5 text-center text-xs text-slate-500 font-mono">{idx + 1}</span>
+                  <div className="flex gap-0.5">
+                    <button onClick={() => moveGeminiKey(idx, 'up')} disabled={idx === 0} className="rounded px-1 py-0.5 text-xs text-slate-500 hover:bg-slate-800 disabled:opacity-20">▲</button>
+                    <button onClick={() => moveGeminiKey(idx, 'down')} disabled={idx === geminiKeyOrder.length - 1} className="rounded px-1 py-0.5 text-xs text-slate-500 hover:bg-slate-800 disabled:opacity-20">▼</button>
+                  </div>
+                  <div className="flex-1 flex items-center gap-2">
+                    <Input
+                      type={showKey[slot] ? 'text' : 'password'}
+                      placeholder={`${t('geminiApiKey')} #${idx + 1}`}
+                      value={inputValues[slot]}
+                      onChange={(e) => setInputValues((prev) => ({ ...prev, [slot]: e.target.value }))}
+                      className="h-8 flex-1 border-slate-700 bg-slate-950 text-xs text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                    />
+                    {inputValues[slot] && (
+                      <button type="button" onClick={() => setShowKey((prev) => ({ ...prev, [slot]: !prev[slot] }))} className="text-slate-400 hover:text-slate-200">
+                        {showKey[slot] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                  {isConfigured(slot) ? (
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="border-0 text-[10px] bg-emerald-500/10 text-emerald-400">{t('configured')}</Badge>
+                      <button onClick={() => handleDeleteKey(slot)} className="text-red-400 hover:text-red-300 text-xs"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  ) : inputValues[slot].trim() ? (
+                    <Button size="sm" onClick={() => handleSaveKey(slot)} disabled={savingKey === slot} className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white">
+                      {savingKey === slot ? '...' : savedKey === slot ? <Check className="h-3 w-3" /> : t('save')}
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

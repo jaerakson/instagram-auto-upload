@@ -30,6 +30,7 @@ export interface PerformanceRecord {
   comments: number;
   saves: number;
   reach: number;
+  impressions: number;
   followersDelta: number;      // 팔로워 변화량
 }
 
@@ -39,10 +40,22 @@ export type MediaType = 'image' | 'reels';
 export type StylePreset = 'photorealistic' | 'anime' | 'ghibli' | 'vintage_film' | 'watercolor' | '3d_render' | 'pop_art';
 export type TrendPreset = 'portrait' | 'anime' | 'dark_mood' | 'minimal' | 'trend_tracking';
 export type ImageQuality = 'standard' | 'ultra';
+export type SubjectPreset = 'woman' | 'man' | 'cat' | 'dog' | 'landscape' | 'food' | 'custom';
 
 export const IMAGE_QUALITY_COSTS: Record<ImageQuality, number> = {
   standard: 0.04,
   ultra: 0.08,
+};
+
+export const DEFAULT_CAPTION_LENGTH = 150;
+
+export const DEFAULT_SUBJECT_PROMPTS: Record<Exclude<SubjectPreset, 'custom'>, string> = {
+  woman: 'beautiful woman, elegant pose, expressive eyes, fashion portrait',
+  man: 'handsome man, strong features, confident pose, portrait photography',
+  cat: 'adorable cat, fluffy fur, curious expression, pet photography',
+  dog: 'cute dog, playful expression, loyal companion, pet photography',
+  landscape: 'stunning landscape, dramatic sky, natural beauty, scenic vista',
+  food: 'delicious food, appetizing presentation, gourmet plating, food photography',
 };
 
 export interface AppSettings {
@@ -57,10 +70,14 @@ export interface AppSettings {
   generatePrompt: string;      // 게시물 생성 프롬프트 (시트 커스텀)
   mediaType: MediaType;
   stylePreset: StylePreset;
+  subjectPreset: SubjectPreset;
+  subjectCustom: string;               // custom 선택 시 직접 입력한 주제
   stylePrompts: Record<string, string>; // 스타일별 프롬프트 (시트 커스텀)
   imageQuality: ImageQuality;
+  captionLength: number;         // 캡션 목표 글자수 (기본값 150)
   googleDriveAutoSave: boolean;
   googleDriveFolderId: string;
+  geminiKeyOrder: string;           // 쉼표 구분 순서, 예: "GEMINI_KEY,GEMINI_KEY_3,GEMINI_KEY_2"
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;
@@ -160,13 +177,14 @@ export interface DashboardSummary {
 
 export interface WeeklyEngagement {
   date: string;
+  views: number;
   likes: number;
   comments: number;
   saves: number;
 }
 
 // 인증정보 관리
-export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GEMINI_KEY';
+export type CredentialKey = 'INSTAGRAM_ACCESS_TOKEN' | 'INSTAGRAM_USER_ID' | 'GEMINI_KEY' | 'GEMINI_KEY_2' | 'GEMINI_KEY_3' | 'GEMINI_KEY_4' | 'GEMINI_KEY_5';
 
 export interface CredentialStatus {
   key: CredentialKey;

@@ -3,6 +3,8 @@ import { del } from '@vercel/blob';
 import { sheetsService } from '@/lib/google-sheets';
 import type { ApiResponse, PostRecord } from '@/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     if (!process.env.GOOGLE_SHEETS_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {

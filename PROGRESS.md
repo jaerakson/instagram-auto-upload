@@ -1,3 +1,66 @@
+## 2026-07-24 (집) — v4.0: 대규모 기능 추가 + 버그 수정
+- 브랜치: main
+- 완료:
+  ### 버그 수정
+  - **비용 추적 4건**: 수동 업로드 시 totalTokens/totalCost 누락, generateCaptionWithRetry usage 누적, falsy 체크 → null 체크
+  - **중복 게시물 방지**: upload route에 caption 중복 체크 게이트, instagram.ts container/publish 분리, retry 시 원래 ID 유지
+  - **handleReset에서 retryOriginalId 미초기화** 수정
+  - **Sheets addPost 빈 행 삽입 버그**: append → update(마지막 행+1) 방식으로 수정
+  - **이어서 하기 이미지 안 나옴**: ImageResultView에 onError fallback 추가
+
+  ### Instagram 동기화
+  - **동기화 API** (`/api/instagram/sync`): 이미지 URL 갱신 + 삭제 감지 + 인스타에만 있는 게시물 import
+  - **batchUpdatePosts / batchUpsertPerformance**: Sheets API 호출 최소화 (rate limit 해결)
+  - **성과 데이터 동기화**: likes/comments는 getRecentMedia에서, reach/saves/views는 getMediaInsights에서
+  - **views metric**: Instagram API v25.0에서 impressions → views로 변경 확인·적용
+  - **개별 이미지 갱신**: 깨진 이미지에 🔄 버튼 → getMediaUrl로 새 CDN URL 획득
+  - **인스타 게시물 표시**: imported 게시물에 "Instagram" 배지 + 파란 배경 + 필터 탭
+
+  ### 작업내역 개선
+  - **조회수 컬럼** 추가 (views/reach 형태)
+  - **컬럼 헤더 클릭 정렬**: 날짜/조회수/좋아요/댓글/비용/상태 (asc/desc 토글)
+  - **페이징**: 10/20/50/100개 선택 + «‹›» 네비게이션
+
+  ### 대시보드
+  - **Stat Cards 4개**: 총 게시물 / 총 조회수 / 총 좋아요 / 총 댓글
+  - **duplicate key 에러 수정**: 빈 id 행 필터 + fallback key
+
+  ### 성과분석
+  - **조회수** 추가: Engagement 차트 + 스타일별 성과 바에 views 라인/바 추가
+  - **WeeklyEngagement 타입**에 views 필드 추가
+
+  ### 게시물 생성
+  - **직접 사진/영상 업로드**: 파일 → Vercel Blob → pipeline 진행 (AI 이미지 생성 스킵)
+  - **캡션 수동 작성**: "직접 작성" 버튼으로 AI 없이 캡션 입력
+  - **캡션 글자수 제어**: 슬라이더 + 짧게/보통/길게 프리셋 + Gemini 프롬프트 강화
+  - **전체 자동생성 스킵 로직**: 이미 완료된 단계(프롬프트/이미지/캡션) 자동 스킵
+  - **사용된 Gemini 키 번호 표시**: 비용 영역에 `Key: #N` 표시
+
+  ### Gemini 다중 키
+  - **GEMINI_KEY ~ GEMINI_KEY_5**: 최대 5개 등록
+  - **자동 폴백**: 같은 키 3번 시도 후 실패 → 다음 키로 자동 전환
+  - **우선순위 설정**: 설정에서 ▲▼ 화살표로 키 순서 변경
+  - **매 요청 키 #1 리셋**: generate-prompt/caption API에서 resetToFirstKey()
+  - **"no longer available" 에러도 폴백 대상**에 포함
+
+  ### 주제(Subject) 프리셋
+  - **SubjectPreset 타입**: woman/man/cat/dog/landscape/food/custom
+  - 설정 + 게시물 생성에 주제 select 추가
+  - 프롬프트 생성 시 스타일 + 주제 결합
+
+  ### 설정 UI 컴팩트화
+  - **Card 통합**: 기본 설정 (시간/언어/형식/품질/글자수/Drive) → grid 1개 Card
+  - **스타일 + 주제** → 1개 Card
+  - **설명 → hover tooltip**: HelpCircle 아이콘 + 마우스 hover 시 표시
+
+- 현재 상태: **v4.0 완성. 빌드 정상. 23개 파일 변경, +1428/-387 줄.**
+- 다음 할 일:
+  - 모바일 반응형 개선
+  - Vercel 배포 후 실제 동작 검증
+  - 자동 모드 cron 테스트
+- 관련 파일: src/app/create/page.tsx, src/app/history/page.tsx, src/app/page.tsx, src/app/analytics/page.tsx, src/app/settings/page.tsx, src/lib/gemini.ts, src/lib/instagram.ts, src/lib/google-sheets.ts, src/lib/services.ts, src/lib/credential-manager.ts, src/types/index.ts 외
+- 푸시 여부: 미푸시 (커밋 필요)
+
 ## 2026-07-22 08:00 (집) — fix: 수동 게시물 생성 시 비용 추적 누락 수정
 - 브랜치: main
 - 완료:
