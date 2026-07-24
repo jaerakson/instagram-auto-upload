@@ -25,6 +25,12 @@ export class GeminiService {
     this.currentKeyIndex = 0;
   }
 
+  setKeyIndex(index: number): void {
+    if (index >= 0 && index < this.apiKeys.length) {
+      this.currentKeyIndex = index;
+    }
+  }
+
   private rotateKey(): boolean {
     if (this.apiKeys.length <= 1) return false;
     this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;

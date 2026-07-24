@@ -120,6 +120,8 @@ export default function CreatePage() {
   const [subjectPreset, setSubjectPreset] = useState<SubjectPreset>('woman');
   const [subjectCustom, setSubjectCustom] = useState('');
   const [geminiKeyUsed, setGeminiKeyUsed] = useState<number | null>(null);
+  const [selectedKeyIndex, setSelectedKeyIndex] = useState<number | null>(null); // null = auto
+  const [geminiKeyNames, setGeminiKeyNames] = useState<string[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [driveAutoSave, setDriveAutoSave] = useState(false);
   const [driveFolderId, setDriveFolderId] = useState('');
@@ -149,6 +151,7 @@ export default function CreatePage() {
           if (s.captionLength) setCaptionLength(s.captionLength);
           if (s.subjectPreset) setSubjectPreset(s.subjectPreset);
           if (s.subjectCustom) setSubjectCustom(s.subjectCustom);
+          if (s.geminiKeyNames) setGeminiKeyNames(s.geminiKeyNames.split(','));
           if (s.googleDriveAutoSave) setDriveAutoSave(true);
           if (s.googleDriveFolderId) setDriveFolderId(s.googleDriveFolderId);
         }
@@ -227,7 +230,7 @@ export default function CreatePage() {
       const res = await fetch('/api/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom }),
+        body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom, geminiKeyIndex: selectedKeyIndex }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Prompt generation failed');
@@ -277,6 +280,7 @@ export default function CreatePage() {
           language: captionLang,
           mode,
           captionLength,
+          geminiKeyIndex: selectedKeyIndex,
         }),
       });
       const json = await res.json();
@@ -340,7 +344,7 @@ export default function CreatePage() {
         const promptRes = await fetch('/api/generate-prompt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom }),
+          body: JSON.stringify({ stylePreset, subjectPreset, subjectCustom, geminiKeyIndex: selectedKeyIndex }),
           signal,
         });
         const promptJson = await promptRes.json();
@@ -471,6 +475,7 @@ export default function CreatePage() {
             language: captionLang,
             mode: 'full',
             captionLength,
+            geminiKeyIndex: selectedKeyIndex,
           }),
           signal,
         });
@@ -1029,7 +1034,21 @@ export default function CreatePage() {
           )}
           {(totalTokens > 0 || totalCost > 0) && (
             <div className="flex items-center gap-4 text-xs text-slate-500">
-              {geminiKeyUsed && <span>Key: <span className="text-purple-400 font-mono">#{geminiKeyUsed}</span></span>}
+              <span className="flex items-center gap-1">
+                Key:
+                <select
+                  value={selectedKeyIndex ?? ''}
+                  onChange={(e) => setSelectedKeyIndex(e.target.value === '' ? null : Number(e.target.value))}
+                  className="rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="">{t('autoKey')}</option>
+                  {[0,1,2,3,4].map(i => {
+                    const name = geminiKeyNames[i];
+                    return <option key={i} value={i}>#{i+1}{name ? ` ${name}` : ''}</option>;
+                  })}
+                </select>
+                {geminiKeyUsed && <span className="text-purple-400 font-mono">→ #{geminiKeyUsed}</span>}
+              </span>
               <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
               <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
               <span>{t('estimatedImageCost')}: <span className="text-blue-400 font-mono">${mediaType === 'reels' ? '2.80' : IMAGE_QUALITY_COSTS[imageQuality].toFixed(2)}</span></span>

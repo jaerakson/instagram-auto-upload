@@ -76,6 +76,7 @@ const defaultSettings: AppSettings = {
   googleDriveAutoSave: false,
   googleDriveFolderId: '',
   geminiKeyOrder: 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5',
+  geminiKeyNames: ',,,,',
   instagramConnected: false,
   googleSheetsConnected: false,
   geminiConnected: false,
@@ -119,6 +120,7 @@ export default function SettingsPage() {
 
   const GEMINI_KEY_SLOTS: CredentialKey[] = ['GEMINI_KEY', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_4', 'GEMINI_KEY_5'];
   const [geminiKeyOrder, setGeminiKeyOrder] = useState<CredentialKey[]>(GEMINI_KEY_SLOTS);
+  const [geminiKeyNames, setGeminiKeyNames] = useState<Record<string, string>>({});
 
   function moveGeminiKey(index: number, direction: 'up' | 'down') {
     const newOrder = [...geminiKeyOrder];
@@ -137,7 +139,14 @@ export default function SettingsPage() {
         if (json.success && json.data) {
           setSettings((prev) => ({ ...prev, ...json.data, language: currentLocale }));
           if (json.data.geminiKeyOrder) {
-            setGeminiKeyOrder(json.data.geminiKeyOrder.split(',').filter(Boolean) as CredentialKey[]);
+            const order = json.data.geminiKeyOrder.split(',').filter(Boolean) as CredentialKey[];
+            setGeminiKeyOrder(order);
+            if (json.data.geminiKeyNames) {
+              const names = json.data.geminiKeyNames.split(',');
+              const map: Record<string, string> = {};
+              order.forEach((slot, i) => { map[slot] = names[i] || ''; });
+              setGeminiKeyNames(map);
+            }
           }
         }
       } catch {
@@ -250,7 +259,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/sheets/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, language: currentLocale, geminiKeyOrder: geminiKeyOrder.join(',') }),
+        body: JSON.stringify({ ...settings, language: currentLocale, geminiKeyOrder: geminiKeyOrder.join(','), geminiKeyNames: geminiKeyOrder.map(s => geminiKeyNames[s] || '').join(',') }),
       });
       if (res.ok) {
         setSaved(true);
@@ -586,30 +595,46 @@ export default function SettingsPage() {
                     <button onClick={() => moveGeminiKey(idx, 'up')} disabled={idx === 0} className="rounded px-1 py-0.5 text-xs text-slate-500 hover:bg-slate-800 disabled:opacity-20">▲</button>
                     <button onClick={() => moveGeminiKey(idx, 'down')} disabled={idx === geminiKeyOrder.length - 1} className="rounded px-1 py-0.5 text-xs text-slate-500 hover:bg-slate-800 disabled:opacity-20">▼</button>
                   </div>
-                  <div className="flex-1 flex items-center gap-2">
-                    <Input
-                      type={showKey[slot] ? 'text' : 'password'}
-                      placeholder={`${t('geminiApiKey')} #${idx + 1}`}
-                      value={inputValues[slot]}
-                      onChange={(e) => setInputValues((prev) => ({ ...prev, [slot]: e.target.value }))}
-                      className="h-8 flex-1 border-slate-700 bg-slate-950 text-xs text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
-                    />
-                    {inputValues[slot] && (
+                  {/* 별명 */}
+                  <Input
+                    value={geminiKeyNames[slot] || ''}
+                    onChange={(e) => setGeminiKeyNames(prev => ({ ...prev, [slot]: e.target.value }))}
+                    placeholder={t('keyNamePlaceholder')}
+                    className="h-8 w-24 border-slate-700 bg-slate-950 text-xs text-slate-200 placeholder:text-slate-600"
+                  />
+                  {/* 키 입력 또는 등록 상태 */}
+                  {isConfigured(slot) ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-xs font-mono text-slate-500">
+                        {showKey[slot] ? (inputValues[slot] || '••••••••') : '••••••••'}
+                      </span>
                       <button type="button" onClick={() => setShowKey((prev) => ({ ...prev, [slot]: !prev[slot] }))} className="text-slate-400 hover:text-slate-200">
                         {showKey[slot] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                       </button>
-                    )}
-                  </div>
-                  {isConfigured(slot) ? (
-                    <div className="flex items-center gap-1">
                       <Badge variant="outline" className="border-0 text-[10px] bg-emerald-500/10 text-emerald-400">{t('configured')}</Badge>
                       <button onClick={() => handleDeleteKey(slot)} className="text-red-400 hover:text-red-300 text-xs"><Trash2 className="h-3 w-3" /></button>
                     </div>
-                  ) : inputValues[slot].trim() ? (
-                    <Button size="sm" onClick={() => handleSaveKey(slot)} disabled={savingKey === slot} className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white">
-                      {savingKey === slot ? '...' : savedKey === slot ? <Check className="h-3 w-3" /> : t('save')}
-                    </Button>
-                  ) : null}
+                  ) : (
+                    <div className="flex-1 flex items-center gap-2">
+                      <Input
+                        type={showKey[slot] ? 'text' : 'password'}
+                        placeholder={t('enterKey')}
+                        value={inputValues[slot]}
+                        onChange={(e) => setInputValues((prev) => ({ ...prev, [slot]: e.target.value }))}
+                        className="h-8 flex-1 border-slate-700 bg-slate-950 text-xs text-slate-200 placeholder:text-slate-600 focus:border-purple-500"
+                      />
+                      {inputValues[slot] && (
+                        <button type="button" onClick={() => setShowKey((prev) => ({ ...prev, [slot]: !prev[slot] }))} className="text-slate-400 hover:text-slate-200">
+                          {showKey[slot] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                      {inputValues[slot].trim() && (
+                        <Button size="sm" onClick={() => handleSaveKey(slot)} disabled={savingKey === slot} className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white">
+                          {savingKey === slot ? '...' : savedKey === slot ? <Check className="h-3 w-3" /> : t('save')}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

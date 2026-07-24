@@ -110,7 +110,8 @@
     "chars": "chars",
     "captionShort": "Short",
     "captionNormal": "Normal",
-    "captionLong": "Long"
+    "captionLong": "Long",
+    "autoKey": "Auto"
   },
   "history": {
     "title": "History",
@@ -186,6 +187,7 @@
     "instagramUserId": "Instagram User ID",
     "geminiApiKey": "Gemini API Key",
     "geminiKeyPriority": "Priority",
+    "keyNamePlaceholder": "Name",
     "enterKey": "Enter key",
     "testConnection": "Test Connection",
     "testing": "Testing...",

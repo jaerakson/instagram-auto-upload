@@ -18,6 +18,7 @@ export async function POST(request: Request) {
       if (body.stylePreset) stylePreset = body.stylePreset;
       if (body.subjectPreset) subjectPreset = body.subjectPreset;
       if (body.subjectCustom) subjectCustom = body.subjectCustom;
+      var geminiKeyIndex = body.geminiKeyIndex ?? null;
       if (body.stylePrompt) stylePromptOverride = body.stylePrompt;
       if (body.trendPrompt) trendPromptOverride = body.trendPrompt;
       if (body.generatePrompt) generatePromptOverride = body.generatePrompt;
@@ -26,7 +27,11 @@ export async function POST(request: Request) {
     }
 
     const geminiService = await getGeminiService();
-    geminiService.resetToFirstKey();
+    if (geminiKeyIndex != null) {
+      geminiService.setKeyIndex(geminiKeyIndex);
+    } else {
+      geminiService.resetToFirstKey();
+    }
 
     let performanceData: PerformanceRecord[] = [];
     try {

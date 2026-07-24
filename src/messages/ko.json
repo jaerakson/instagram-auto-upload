@@ -110,7 +110,8 @@
     "chars": "자",
     "captionShort": "짧게",
     "captionNormal": "보통",
-    "captionLong": "길게"
+    "captionLong": "길게",
+    "autoKey": "자동"
   },
   "history": {
     "title": "작업 내역",
@@ -186,6 +187,7 @@
     "instagramUserId": "Instagram User ID",
     "geminiApiKey": "Gemini API Key",
     "geminiKeyPriority": "우선순위",
+    "keyNamePlaceholder": "별명",
     "enterKey": "키를 입력하세요",
     "testConnection": "연결 테스트",
     "testing": "테스트 중...",

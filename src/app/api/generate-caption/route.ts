@@ -4,7 +4,7 @@ import type { ApiResponse, TrendResult } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const { prompt, style, language, trendKeywords, mode, captionLength } = await request.json();
+    const { prompt, style, language, trendKeywords, mode, captionLength, geminiKeyIndex } = await request.json();
 
     if (!prompt) {
       return NextResponse.json<ApiResponse>(
@@ -32,7 +32,11 @@ export async function POST(request: Request) {
     }
 
     const geminiService = await getGeminiService();
-    geminiService.resetToFirstKey();
+    if (geminiKeyIndex != null) {
+      geminiService.setKeyIndex(geminiKeyIndex);
+    } else {
+      geminiService.resetToFirstKey();
+    }
     const result = await geminiService.generateCaptionWithRetry({
       prompt,
       style,
