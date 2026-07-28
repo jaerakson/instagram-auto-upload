@@ -241,28 +241,16 @@ export class InstagramService {
     reach: number;
     impressions: number;
   }> {
+    // v25.0: metric_type=total_value로 총합 요청, total_value 구조로 응답
     const res = await this.request<{
-      data: Array<{ name: string; values: Array<{ value: number }> }>;
+      data: Array<{ name: string; total_value?: { value: number }; values?: Array<{ value: number }> }>;
     }>(
-      `${this.baseUrl}/${mediaId}/insights?metric=likes,comments,saved,reach&access_token=${this.accessToken}`,
+      `${this.baseUrl}/${mediaId}/insights?metric=likes,comments,saved,reach,views&metric_type=total_value&access_token=${this.accessToken}`,
     );
 
     const metrics: Record<string, number> = {};
     for (const item of res.data) {
-      metrics[item.name] = item.values[0]?.value ?? 0;
-    }
-
-    // views metric (v25.0+에서 impressions 대체)
-    let impressions = 0;
-    try {
-      const viewsRes = await this.request<{
-        data: Array<{ name: string; values: Array<{ value: number }> }>;
-      }>(
-        `${this.baseUrl}/${mediaId}/insights?metric=views&access_token=${this.accessToken}`,
-      );
-      impressions = viewsRes.data[0]?.values[0]?.value ?? 0;
-    } catch (e) {
-      console.error(`[Instagram] views metric failed for ${mediaId}:`, e instanceof Error ? e.message : e);
+      metrics[item.name] = item.total_value?.value ?? item.values?.[0]?.value ?? 0;
     }
 
     return {
@@ -270,7 +258,8 @@ export class InstagramService {
       comments: metrics['comments'] ?? 0,
       saves: metrics['saved'] ?? 0,
       reach: metrics['reach'] ?? 0,
-      impressions,
+      // IMAGE 게시물은 views/reach가 0으로 반환될 수 있음 → likes를 최소 폴백
+      impressions: metrics['views'] || metrics['reach'] || metrics['likes'] || 0,
     };
   }
 
@@ -283,6 +272,7 @@ export class InstagramService {
       timestamp: string;
       likeCount: number;
       commentsCount: number;
+      mediaType: string;
     }>
   > {
     const res = await this.request<{
@@ -294,9 +284,10 @@ export class InstagramService {
         timestamp: string;
         like_count: number;
         comments_count: number;
+        media_type: string;
       }>;
     }>(
-      `${this.baseUrl}/${this.userId}/media?fields=id,media_url,permalink,caption,timestamp,like_count,comments_count&limit=${limit}&access_token=${this.accessToken}`,
+      `${this.baseUrl}/${this.userId}/media?fields=id,media_url,permalink,caption,timestamp,like_count,comments_count,media_type&limit=${limit}&access_token=${this.accessToken}`,
     );
 
     return res.data.map((item) => ({
@@ -307,6 +298,7 @@ export class InstagramService {
       timestamp: item.timestamp,
       likeCount: item.like_count ?? 0,
       commentsCount: item.comments_count ?? 0,
+      mediaType: item.media_type || 'IMAGE',
     }));
   }
 

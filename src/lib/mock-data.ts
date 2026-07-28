@@ -134,6 +134,7 @@ export const mockSettings: AppSettings = {
   googleDriveFolderId: '',
   geminiKeyOrder: 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5',
   geminiKeyNames: ',,,,',
+  defaultGeminiKeyIndex: -1,
   instagramConnected: true,
   googleSheetsConnected: true,
   geminiConnected: true,

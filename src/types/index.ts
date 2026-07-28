@@ -79,6 +79,7 @@ export interface AppSettings {
   googleDriveFolderId: string;
   geminiKeyOrder: string;           // 쉼표 구분 순서, 예: "GEMINI_KEY,GEMINI_KEY_3,GEMINI_KEY_2"
   geminiKeyNames: string;           // 쉼표 구분 별명, 예: "메인,백업1,백업2,,"
+  defaultGeminiKeyIndex: number;    // 기본 사용 키 인덱스 (-1 = 자동)
   instagramConnected: boolean;
   googleSheetsConnected: boolean;
   geminiConnected: boolean;

@@ -122,6 +122,8 @@ export default function CreatePage() {
   const [geminiKeyUsed, setGeminiKeyUsed] = useState<number | null>(null);
   const [selectedKeyIndex, setSelectedKeyIndex] = useState<number | null>(null); // null = auto
   const [geminiKeyNames, setGeminiKeyNames] = useState<string[]>([]);
+  const [configuredKeyIndices, setConfiguredKeyIndices] = useState<number[]>([]);
+  const consecutiveErrorsRef = useRef(0);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [driveAutoSave, setDriveAutoSave] = useState(false);
   const [driveFolderId, setDriveFolderId] = useState('');
@@ -152,8 +154,34 @@ export default function CreatePage() {
           if (s.subjectPreset) setSubjectPreset(s.subjectPreset);
           if (s.subjectCustom) setSubjectCustom(s.subjectCustom);
           if (s.geminiKeyNames) setGeminiKeyNames(s.geminiKeyNames.split(','));
+          if (s.defaultGeminiKeyIndex != null && s.defaultGeminiKeyIndex >= 0) setSelectedKeyIndex(s.defaultGeminiKeyIndex);
           if (s.googleDriveAutoSave) setDriveAutoSave(true);
           if (s.googleDriveFolderId) setDriveFolderId(s.googleDriveFolderId);
+        }
+      } catch { /* ignore */ }
+
+      // 등록된 Gemini 키 인덱스 목록 로드 (geminiKeyOrder 기반 UI 순서)
+      try {
+        const credRes = await fetch('/api/settings/credentials');
+        const credJson = await credRes.json();
+        if (credJson.success && Array.isArray(credJson.data)) {
+          const settingsRes2 = await fetch('/api/sheets/settings');
+          const settingsJson2 = await settingsRes2.json();
+          const keyOrder = (settingsJson2.data?.geminiKeyOrder || 'GEMINI_KEY,GEMINI_KEY_2,GEMINI_KEY_3,GEMINI_KEY_4,GEMINI_KEY_5').split(',');
+          const configuredSet = new Set(
+            credJson.data
+              .filter((c: { key: string; configured: boolean }) => c.configured)
+              .map((c: { key: string }) => c.key)
+          );
+          // UI 순서(0~4)에서 등록된 키만 필터
+          const indices = keyOrder
+            .map((_: string, i: number) => i)
+            .filter((i: number) => configuredSet.has(keyOrder[i]));
+          setConfiguredKeyIndices(indices);
+          // 기본 키가 설정 안 됐으면 첫 번째 등록 키 사용
+          if (selectedKeyIndex == null && indices.length > 0) {
+            setSelectedKeyIndex(indices[0]);
+          }
         }
       } catch { /* ignore */ }
 
@@ -185,6 +213,26 @@ export default function CreatePage() {
 
   const isAllComplete = pipeline.every((s) => s.status === 'complete');
   const isUploadComplete = pipeline[3].status === 'complete';
+
+  // 연속 에러 5회 시 자동 키 전환 (등록된 키만 순회)
+  function handleGeminiError(error: unknown) {
+    consecutiveErrorsRef.current++;
+    if (consecutiveErrorsRef.current >= 5 && configuredKeyIndices.length > 1) {
+      const currentPos = configuredKeyIndices.indexOf(selectedKeyIndex ?? -1);
+      const nextPos = (currentPos + 1) % configuredKeyIndices.length;
+      const nextKey = configuredKeyIndices[nextPos];
+      setSelectedKeyIndex(nextKey);
+      consecutiveErrorsRef.current = 0;
+      const keyName = geminiKeyNames[nextKey] || `#${nextKey + 1}`;
+      setErrorMsg(`키 ${keyName}(으)로 자동 전환됨. ${error instanceof Error ? error.message : String(error)}`);
+    } else {
+      setErrorMsg(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleGeminiSuccess() {
+    consecutiveErrorsRef.current = 0;
+  }
 
   function handleReset() {
     setPipeline(steps.map(({ step }) => ({ step, status: 'idle' })));
@@ -234,6 +282,7 @@ export default function CreatePage() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Prompt generation failed');
+      handleGeminiSuccess();
       setPrompt(json.data.prompt);
       setStyle(json.data.style);
       if (json.data.trendReport) setTrendReport(json.data.trendReport);
@@ -257,7 +306,7 @@ export default function CreatePage() {
         return next;
       });
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Failed to generate prompt');
+      handleGeminiError(error);
     } finally {
       setGeneratingPrompt(false);
     }
@@ -285,9 +334,11 @@ export default function CreatePage() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Caption generation failed');
+      handleGeminiSuccess();
 
       if (mode === 'full' || mode === 'caption_only') {
         setEditCaption(json.data.caption);
+
       }
       if (mode === 'full' || mode === 'hashtags_only') {
         setEditHashtags(json.data.hashtags);
@@ -298,7 +349,7 @@ export default function CreatePage() {
       if (json.data.totalTokens != null) setTotalTokens(prev => prev + json.data.totalTokens);
       if (json.data.totalCost != null) setTotalCost(prev => prev + json.data.totalCost);
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Failed to generate caption');
+      handleGeminiError(error);
     } finally {
       setGeneratingCaption(false);
       setRegeneratingCaption(false);
@@ -1015,53 +1066,52 @@ export default function CreatePage() {
         </Button>
       </div>
 
-      {/* Progress Bar + Cost */}
-      {(autoAllRunning || totalTokens > 0 || totalCost > 0) && (
+      {/* Gemini Key Selector — 항상 표시 */}
+      <div className="flex items-center gap-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1">
+          Gemini Key:
+          <select
+            value={selectedKeyIndex ?? ''}
+            onChange={(e) => setSelectedKeyIndex(Number(e.target.value))}
+            className="rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
+          >
+            {(configuredKeyIndices.length > 0 ? configuredKeyIndices : [0,1,2,3,4]).map(i => {
+              const name = geminiKeyNames[i];
+              return <option key={i} value={i}>#{i+1}{name ? ` ${name}` : ''}</option>;
+            })}
+          </select>
+          {geminiKeyUsed && <span className="text-purple-400 font-mono">→ #{geminiKeyUsed}</span>}
+        </span>
+        {(totalTokens > 0 || totalCost > 0) && (
+          <>
+            <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
+            <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
+            <span>{t('estimatedImageCost')}: <span className="text-blue-400 font-mono">${mediaType === 'reels' ? '2.80' : IMAGE_QUALITY_COSTS[imageQuality].toFixed(2)}</span></span>
+          </>
+        )}
+        {driveSaveStatus !== 'idle' && (
+          <span className={cn(
+            'font-medium',
+            driveSaveStatus === 'saving' && 'text-blue-400',
+            driveSaveStatus === 'saved' && 'text-emerald-400',
+            driveSaveStatus === 'failed' && 'text-red-400',
+          )}>{t(driveSaveStatus === 'saving' ? 'driveSaving' : driveSaveStatus === 'saved' ? 'driveSaved' : 'driveFailed')}</span>
+        )}
+      </div>
+
+      {/* Progress Bar */}
+      {autoAllRunning && (
         <div className="space-y-2">
-          {autoAllRunning && (
-            <>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">{autoStepLabel}</span>
-                <span className="text-slate-500">{autoProgress}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 transition-all duration-700 ease-out"
-                  style={{ width: `${autoProgress}%` }}
-                />
-              </div>
-            </>
-          )}
-          {(totalTokens > 0 || totalCost > 0) && (
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                Key:
-                <select
-                  value={selectedKeyIndex ?? ''}
-                  onChange={(e) => setSelectedKeyIndex(e.target.value === '' ? null : Number(e.target.value))}
-                  className="rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-xs text-slate-200 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">{t('autoKey')}</option>
-                  {[0,1,2,3,4].map(i => {
-                    const name = geminiKeyNames[i];
-                    return <option key={i} value={i}>#{i+1}{name ? ` ${name}` : ''}</option>;
-                  })}
-                </select>
-                {geminiKeyUsed && <span className="text-purple-400 font-mono">→ #{geminiKeyUsed}</span>}
-              </span>
-              <span>Tokens: <span className="text-slate-300 font-mono">{totalTokens.toLocaleString()}</span></span>
-              <span>Cost: <span className="text-emerald-400 font-mono">${totalCost.toFixed(4)}{exchangeRate ? ` (≈${Math.round(totalCost * exchangeRate).toLocaleString()}원)` : ''}</span></span>
-              <span>{t('estimatedImageCost')}: <span className="text-blue-400 font-mono">${mediaType === 'reels' ? '2.80' : IMAGE_QUALITY_COSTS[imageQuality].toFixed(2)}</span></span>
-              {driveSaveStatus !== 'idle' && (
-                <span className={cn(
-                  'font-medium',
-                  driveSaveStatus === 'saving' && 'text-blue-400',
-                  driveSaveStatus === 'saved' && 'text-emerald-400',
-                  driveSaveStatus === 'failed' && 'text-red-400',
-                )}>{t(driveSaveStatus === 'saving' ? 'driveSaving' : driveSaveStatus === 'saved' ? 'driveSaved' : 'driveFailed')}</span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400">{autoStepLabel}</span>
+            <span className="text-slate-500">{autoProgress}%</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 transition-all duration-700 ease-out"
+              style={{ width: `${autoProgress}%` }}
+            />
+          </div>
         </div>
       )}
 

@@ -43,7 +43,7 @@ export class GeminiService {
       || msg.includes('resource exhausted') || msg.includes('no longer available') || msg.includes('not available');
   }
 
-  private static readonly RETRIES_PER_KEY = 3;
+  private static readonly RETRIES_PER_KEY = 5;
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
     for (let keyIdx = 0; keyIdx < this.apiKeys.length; keyIdx++) {

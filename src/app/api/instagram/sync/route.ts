@@ -3,7 +3,6 @@ import { sheetsService } from '@/lib/google-sheets';
 import { getInstagramService } from '@/lib/services';
 import type { ApiResponse, PostRecord, PerformanceRecord } from '@/types';
 
-const INSIGHTS_BATCH_SIZE = 25; // rate limit 방지: 한 번에 최대 25개 insights 조회
 
 export async function POST() {
   try {
@@ -99,13 +98,12 @@ export async function POST() {
       });
     }
 
-    // reach/saves: 아직 데이터 없는 게시물 우선, 최대 INSIGHTS_BATCH_SIZE개만
+    // reach/saves: 아직 데이터 없는 게시물 전부 수집
     const needInsights = recentMedia
       .filter(m => {
         const p = perfMap.get(m.id);
         return !p || p.reach === 0 || p.impressions === 0;
-      })
-      .slice(0, INSIGHTS_BATCH_SIZE);
+      });
 
     for (const media of needInsights) {
       try {
