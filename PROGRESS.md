@@ -1,3 +1,26 @@
+## 2026-07-28 (집) — fix: 조회수 0 근본 수정 + Gemini 키 선택 UI 개선
+- 브랜치: main
+- 완료:
+  ### 성과 분석 조회수 0 수정
+  - **Instagram insights API 통합 호출**: 2회 분리 호출 → `metric_type=total_value`로 1회 통합 (likes,comments,saved,reach,views)
+  - **IMAGE 게시물 조회수 폴백**: Instagram API가 IMAGE 타입에 views/reach=0 반환 → `views || reach || likes` 순 폴백
+  - **sync 배치 제한 제거**: `INSIGHTS_BATCH_SIZE=25` 제한 삭제 → 모든 impressions=0 게시물 수집
+  - **getRecentMedia에 media_type 추가**: IMAGE/VIDEO 구분 가능
+
+  ### Gemini 키 선택 UI 개선
+  - **키 선택 드롭다운 항상 표시**: cost 섹션 내부 → 외부로 분리, 페이지 로드 시부터 보임
+  - **등록된 키만 드롭다운에 표시**: credentials API + geminiKeyOrder 기반 필터링
+  - **설정 기본 키 로드**: `defaultGeminiKeyIndex` 설정 추가 (types, sheets, settings 전체 연동)
+  - **에러 5회 시 자동 키 전환**: 연속 실패 카운터 → 등록 키만 순회하며 전환
+  - **RETRIES_PER_KEY 3→5**: 백엔드 재시도 횟수 증가
+
+  ### CLAUDE.md 재작성
+  - `project_CLAUDE_template.md` 6섹션 구조로 전체 재작성 (PRD, TRD, UI 가이드, 하네스, 프로젝트 규칙)
+
+- 현재 상태: **수정 완료. 빌드 정상. origin/main 푸시 완료.**
+- 관련 커밋: cbbbccf
+- 푸시 여부: origin/main 푸시 완료
+
 ## 2026-07-24 (집) — v4.0: 대규모 기능 추가 + 버그 수정
 - 브랜치: main
 - 완료:
