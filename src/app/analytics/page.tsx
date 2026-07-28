@@ -103,9 +103,10 @@ export default function AnalyticsPage() {
         const styleMap = new Map<string, { views: number[]; likes: number[]; comments: number[]; saves: number[] }>();
         posts.forEach((post) => {
           const perf = performanceData.find((p) => p.mediaId === post.mediaId);
-          if (!perf || !post.style) return;
-          if (!styleMap.has(post.style)) styleMap.set(post.style, { views: [], likes: [], comments: [], saves: [] });
-          const s = styleMap.get(post.style)!;
+          if (!perf) return;
+          const styleName = post.style || 'other';
+          if (!styleMap.has(styleName)) styleMap.set(styleName, { views: [], likes: [], comments: [], saves: [] });
+          const s = styleMap.get(styleName)!;
           s.views.push(perf.impressions || perf.reach || 0);
           s.likes.push(perf.likes);
           s.comments.push(perf.comments);
@@ -216,6 +217,23 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
         {collectButton}
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid gap-4 sm:grid-cols-4">
+        {[
+          { label: t('views'), value: weeklyEngagement.reduce((s, w) => s + w.views, 0), color: 'text-blue-400' },
+          { label: t('likes'), value: weeklyEngagement.reduce((s, w) => s + w.likes, 0), color: 'text-purple-400' },
+          { label: t('comments'), value: weeklyEngagement.reduce((s, w) => s + w.comments, 0), color: 'text-pink-400' },
+          { label: t('saves'), value: weeklyEngagement.reduce((s, w) => s + w.saves, 0), color: 'text-orange-400' },
+        ].map(({ label, value, color }) => (
+          <Card key={label} className="border-slate-800 bg-slate-900">
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-slate-400">{label}</p>
+              <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Engagement Trend */}
