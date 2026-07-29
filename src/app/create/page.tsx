@@ -593,34 +593,45 @@ export default function CreatePage() {
         mediaUrl: uploadJson.data.mediaUrl || '',
         postedAt: new Date().toISOString(),
       };
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: retryOriginalId || crypto.randomUUID(),
-          date: new Date().toISOString(),
-          prompt: generatedPrompt.trim(),
-          caption: generatedCaption,
-          hashtags: generatedHashtags,
-          imageUrl: uploadJson.data.imageUrl || imageResult.imageUrl,
-          mediaId: uploadJson.data.mediaId,
-          mediaUrl: uploadJson.data.mediaUrl || '',
-          status: 'published',
-          trendReport: generatedTrendReport,
-          style: generatedStyle || '',
-          totalTokens: runTokens,
-          totalCost: runCost,
-        }),
-        signal,
-      });
+      const postData = {
+        prompt: generatedPrompt.trim(),
+        caption: generatedCaption,
+        hashtags: generatedHashtags,
+        imageUrl: uploadJson.data.imageUrl || imageResult.imageUrl,
+        mediaId: uploadJson.data.mediaId,
+        mediaUrl: uploadJson.data.mediaUrl || '',
+        status: 'published',
+        trendReport: generatedTrendReport,
+        style: generatedStyle || '',
+        totalTokens: runTokens,
+        totalCost: runCost,
+        currentStep: 4,
+        mediaType,
+        stylePreset,
+        captionLang,
+        trendPreset,
+      };
       if (currentJobId) {
+        // 기존 job 레코드를 published로 업데이트 (중복 방지)
         await fetch('/api/pipeline/job', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentJobId, currentStep: 4, status: 'published', mediaId: uploadJson.data.mediaId, mediaUrl: uploadJson.data.mediaUrl || '', mediaType, stylePreset, captionLang, trendPreset, totalTokens: runTokens, totalCost: runCost }),
+          body: JSON.stringify({ id: currentJobId, ...postData }),
           signal,
         });
         setJobId(null);
+      } else {
+        // job 없이 직접 실행된 경우에만 새 레코드 생성
+        await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: retryOriginalId || crypto.randomUUID(),
+            date: new Date().toISOString(),
+            ...postData,
+          }),
+          signal,
+        });
       }
       setAutoProgress(100);
       setAutoStepLabel(t('complete'));
