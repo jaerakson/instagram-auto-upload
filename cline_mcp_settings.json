@@ -1,0 +1,20 @@
+{
+  "servers": [
+    {
+      "name": "github.com/upstash/context7-mcp",
+      "type": "node",
+      "command": "npx",
+      "args": ["@upstash/context7-mcp"],
+      "env": {}
+    },
+    {
+      "name": "tavily-mcp",
+      "type": "node",
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "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"
+      }
+    }
+  ]
+}
